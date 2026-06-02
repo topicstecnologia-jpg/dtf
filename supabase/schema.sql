@@ -58,6 +58,7 @@ create table if not exists public.stories (
   type text not null default 'text' check (type in ('image', 'text')),
   media_url text,
   text text,
+  expires_at timestamptz not null default (now() + interval '24 hours'),
   created_at timestamptz not null default now()
 );
 
@@ -78,6 +79,13 @@ create table if not exists public.post_likes (
   primary key (post_id, user_id)
 );
 
+create table if not exists public.post_views (
+  post_id uuid not null references public.posts(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+
 alter table public.profiles
   add column if not exists username_configured boolean not null default false;
 
@@ -86,6 +94,9 @@ alter table public.profiles
 
 alter table public.profiles
   add column if not exists following_ids jsonb not null default '[]'::jsonb;
+
+alter table public.stories
+  add column if not exists expires_at timestamptz not null default (now() + interval '24 hours');
 
 alter table public.posts
   drop constraint if exists posts_type_check;
@@ -358,6 +369,7 @@ alter table public.posts enable row level security;
 alter table public.stories enable row level security;
 alter table public.comments enable row level security;
 alter table public.post_likes enable row level security;
+alter table public.post_views enable row level security;
 
 drop policy if exists "Profiles are visible to authenticated users" on public.profiles;
 create policy "Profiles are visible to authenticated users"
@@ -450,6 +462,18 @@ create policy "Users can remove their own stories"
   on public.stories for delete
   to authenticated
   using (auth.uid() = user_id);
+
+drop policy if exists "Post views are visible to authenticated users" on public.post_views;
+create policy "Post views are visible to authenticated users"
+  on public.post_views for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Users can record their own post views" on public.post_views;
+create policy "Users can record their own post views"
+  on public.post_views for insert
+  to authenticated
+  with check (auth.uid() = user_id);
 
 drop policy if exists "Comments are visible to authenticated users" on public.comments;
 create policy "Comments are visible to authenticated users"

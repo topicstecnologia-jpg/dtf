@@ -28,6 +28,8 @@ export interface Post {
   caption: string;
   likes: number;
   likedBy: string[];
+  views: number;
+  viewedByCurrentUser?: boolean;
   comments: Comment[];
   timestamp: number;
 }
@@ -39,6 +41,7 @@ export interface Story {
   mediaUrl?: string;
   text?: string;
   timestamp: number;
+  expiresAt?: number;
 }
 
 export interface User {

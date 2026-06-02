@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Play, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon, Camera, Type } from 'lucide-react';
+import { Home, Play, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { motion } from 'framer-motion';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation();
-  const { user, updateHandle, createPost, createStory } = useApp();
+  const { user, updateHandle, createPost } = useApp();
   const [handleInput, setHandleInput] = useState(user?.handle?.replace(/^@/, '') || '');
   const [handleError, setHandleError] = useState('');
   const [isSavingHandle, setIsSavingHandle] = useState(false);
   const [isComposingPost, setIsComposingPost] = useState(false);
-  const [composerMode, setComposerMode] = useState<'post' | 'story'>('post');
   const [postCaption, setPostCaption] = useState('');
   const [postImage, setPostImage] = useState<File | null>(null);
   const [postPreview, setPostPreview] = useState('');
@@ -72,11 +71,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     setIsPublishing(true);
 
     try {
-      if (composerMode === 'story') {
-        await createStory({ text: postCaption, imageFile: postImage });
-      } else {
-        await createPost({ caption: postCaption, imageFile: postImage });
-      }
+      await createPost({ caption: postCaption, imageFile: postImage });
       resetComposer();
       setIsComposingPost(false);
     } catch (error) {
@@ -147,7 +142,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <button
             type="button"
             onClick={() => {
-              setComposerMode('post');
               resetComposer();
               setIsComposingPost(true);
             }}
@@ -231,26 +225,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             className="w-full max-w-md rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#1F1F24] p-6 shadow-2xl"
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-2xl font-bold">{composerMode === 'story' ? 'Novo story' : 'Nova publicacao'}</h2>
+              <h2 className="text-2xl font-bold">Nova publicacao</h2>
               <button type="button" onClick={() => setIsComposingPost(false)} className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white">
                 <X size={20} />
-              </button>
-            </div>
-
-            <div className="mb-5 grid grid-cols-2 rounded-full bg-[#17171B] p-1 border border-white/10">
-              <button
-                type="button"
-                onClick={() => setComposerMode('post')}
-                className={`h-10 rounded-full text-sm font-bold transition-colors ${composerMode === 'post' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
-              >
-                Feed
-              </button>
-              <button
-                type="button"
-                onClick={() => setComposerMode('story')}
-                className={`h-10 rounded-full text-sm font-bold transition-colors ${composerMode === 'story' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
-              >
-                Story
               </button>
             </div>
 
@@ -264,34 +241,21 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               value={postCaption}
               onChange={(event) => setPostCaption(event.target.value)}
               className="w-full min-h-28 rounded-3xl bg-[#17171B] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25 resize-none"
-              placeholder={composerMode === 'story' ? 'Texto do story...' : 'Escreva algo para o feed...'}
+              placeholder="Escreva algo para o feed..."
             />
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              {composerMode === 'story' && (
-                <label className="flex items-center gap-2 rounded-full bg-zinc-800 px-4 py-3 text-sm font-medium cursor-pointer hover:bg-zinc-700">
-                  <Camera size={17} />
-                  Camera
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePostImageChange} />
-                </label>
-              )}
               <label className="flex items-center gap-2 rounded-full bg-zinc-800 px-4 py-3 text-sm font-medium cursor-pointer hover:bg-zinc-700">
                 <ImageIcon size={17} />
-                Galeria
+                Imagem
                 <input type="file" accept="image/*" className="hidden" onChange={handlePostImageChange} />
               </label>
-              {composerMode === 'story' && !postPreview && (
-                <span className="hidden sm:flex items-center gap-2 text-xs text-zinc-500">
-                  <Type size={14} />
-                  Story de texto
-                </span>
-              )}
               <button
                 type="submit"
                 disabled={isPublishing}
                 className="flex-1 h-12 rounded-full bg-[#3F1521] hover:bg-[#5B343C] disabled:opacity-60 text-white font-bold transition-colors"
               >
-                {isPublishing ? 'Publicando...' : composerMode === 'story' ? 'Publicar story' : 'Publicar'}
+                {isPublishing ? 'Publicando...' : 'Publicar'}
               </button>
             </div>
             {postError && <p className="mt-3 text-sm text-red-300">{postError}</p>}

@@ -16,7 +16,6 @@ export const MatchesPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Stories / New Matches Section */}
       <div className="space-y-2">
         <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
           {matches.length === 0 ? (
@@ -30,20 +29,26 @@ export const MatchesPage: React.FC = () => {
               const otherUserId = match.userIds.find(id => id !== user?.id);
               const otherUser = getUserById(otherUserId);
               if (!otherUser) return null;
-              
+
               return (
-                <div 
-                  key={match.id} 
+                <div
+                  key={match.id}
                   className="flex flex-col items-center space-y-1 min-w-[70px] cursor-pointer"
                   onClick={() => navigate(`/chat/${match.id}`)}
                 >
                   <div className="relative">
-                    <img 
-                      src={otherUser.avatarUrl} 
-                      alt={otherUser.name} 
-                      className="w-16 h-16 rounded-full object-cover border-2 border-blue-400 p-0.5"
-                    />
-                    <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white"></div>
+                    {otherUser.avatarUrl ? (
+                      <img
+                        src={otherUser.avatarUrl}
+                        alt={otherUser.name}
+                        className="w-16 h-16 rounded-full object-cover border-2 border-blue-400 p-0.5"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-[#3F1521] border-2 border-blue-400 flex items-center justify-center text-white font-bold">
+                        {otherUser.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white" />
                   </div>
                   <span className="text-xs font-medium text-text-main truncate w-full text-center">{otherUser.name}</span>
                 </div>
@@ -53,10 +58,9 @@ export const MatchesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Messages List */}
       <div className="flex-1 space-y-4">
         <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Mensagens</h2>
-        
+
         {matches.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-center bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
             <MessageCircle size={32} className="text-gray-300 mb-2" />
@@ -70,27 +74,37 @@ export const MatchesPage: React.FC = () => {
               if (!otherUser) return null;
 
               return (
-                <div 
-                  key={match.id} 
+                <div
+                  key={match.id}
                   className="bg-white rounded-2xl p-4 flex items-center space-x-4 shadow-sm border border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
                   onClick={() => navigate(`/chat/${match.id}`)}
                 >
                   <div className="relative">
-                    <img 
-                      src={otherUser.avatarUrl} 
-                      alt={otherUser.name} 
-                      className="w-14 h-14 rounded-full object-cover"
-                    />
+                    {otherUser.avatarUrl ? (
+                      <img
+                        src={otherUser.avatarUrl}
+                        alt={otherUser.name}
+                        className="w-14 h-14 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-full bg-[#3F1521] flex items-center justify-center text-white font-bold">
+                        {otherUser.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start mb-1">
+                    <div className="flex justify-between items-start gap-3 mb-1">
                       <h3 className="text-base font-bold text-text-main truncate">{otherUser.name}</h3>
-                      <span className="text-xs text-gray-400">Agora</span>
+                      <span className="text-xs text-gray-400 shrink-0">Agora</span>
                     </div>
-                    <p className="text-sm text-gray-500 truncate">Vocês deram match! Diga oi.</p>
+                    <p className="text-sm text-gray-500 truncate">
+                      <span className="font-semibold text-gray-700">{otherUser.handle}</span>
+                      <span className="mx-1">.</span>
+                      Voces deram match! Diga oi.
+                    </p>
                   </div>
-                  
+
                   <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold">
                     1
                   </div>

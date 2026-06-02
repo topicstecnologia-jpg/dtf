@@ -120,6 +120,7 @@ export const MOCK_USERS: User[] = [
         caption: 'Cena favorita de Her. A paleta de cores é perfeita.', 
         likes: 45, 
         likedBy: [],
+        views: 0,
         comments: [], 
         timestamp: Date.now() - 1000 * 60 * 60 * 24 
       },
@@ -132,6 +133,7 @@ export const MOCK_USERS: User[] = [
         caption: 'La La Land sempre me faz sonhar.', 
         likes: 32, 
         likedBy: [],
+        views: 0,
         comments: [], 
         timestamp: Date.now() - 1000 * 60 * 60 * 48 
       }
@@ -165,6 +167,7 @@ export const MOCK_USERS: User[] = [
         caption: 'Tudo em Todo o Lugar ao Mesmo Tempo é uma obra-prima moderna.', 
         likes: 28, 
         likedBy: [],
+        views: 0,
         comments: [], 
         timestamp: Date.now() - 1000 * 60 * 60 * 12 
       }
@@ -198,6 +201,7 @@ export const MOCK_USERS: User[] = [
         caption: 'A arte em Retrato de uma Jovem em Chamas é hipnotizante.', 
         likes: 56, 
         likedBy: [],
+        views: 0,
         comments: [], 
         timestamp: Date.now() - 1000 * 60 * 60 * 36 
       }

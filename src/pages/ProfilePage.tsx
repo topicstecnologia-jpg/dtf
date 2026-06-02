@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { MOVIES } from '../data/mock';
@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 
 export const ProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount, toggleFollowUser } = useApp();
+  const { user: currentUser, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount, toggleFollowUser, recordPostView } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'reposts' | 'favorites'>('images');
   const [copied, setCopied] = useState(false);
@@ -48,6 +48,13 @@ export const ProfilePage: React.FC = () => {
     if (activeTab === 'reposts') return post.type === 'repost';
     return false;
   });
+
+  useEffect(() => {
+    if (!currentUser || isCurrentUser) return;
+    filteredPosts.forEach(post => {
+      recordPostView(post.id);
+    });
+  }, [currentUser?.id, isCurrentUser, filteredPosts.map(post => post.id).join('|')]);
 
   const handleMessage = async () => {
     if (isCurrentUser) return;
@@ -312,7 +319,7 @@ export const ProfilePage: React.FC = () => {
                   )}
                   <div className="absolute bottom-2 left-2 flex items-center space-x-1 text-white text-xs drop-shadow-md">
                     <Play size={12} fill="currentColor" />
-                    <span>{Math.floor(Math.random() * 50) + 1}K</span>
+                    <span>{post.views}</span>
                   </div>
                   {post.type === 'repost' && (
                     <div className="absolute top-2 right-2 text-white drop-shadow-md">

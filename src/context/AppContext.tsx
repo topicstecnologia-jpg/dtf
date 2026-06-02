@@ -28,6 +28,8 @@ interface AppContextType {
   toggleFollowUser: (targetUserId: string) => Promise<void>;
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
   createStory: (values: { text?: string; imageFile?: File | null }) => Promise<void>;
+  deleteStory: (storyId: string) => Promise<void>;
+  recordPostView: (postId: string) => Promise<void>;
   getUserById: (userId?: string) => User | undefined;
   completeOnboarding: (answers: Record<string, string>) => Promise<void>;
   swipeMovie: (movieId: string, direction: 'left' | 'right') => Promise<void>;
@@ -144,6 +146,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     caption: row.caption || '',
     likes: row.post_likes?.length || 0,
     likedBy: (row.post_likes || []).map((like: any) => like.user_id),
+    views: row.post_views?.length || 0,
+    viewedByCurrentUser: Boolean((row.post_views || []).some((view: any) => view.user_id === user?.id)),
     comments: (row.comments || []).map((comment: any) => ({
       id: comment.id,
       userId: comment.user_id,
@@ -161,14 +165,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     type: row.type,
     mediaUrl: row.media_url || undefined,
     text: row.text || undefined,
-    timestamp: new Date(row.created_at).getTime()
+    timestamp: new Date(row.created_at).getTime(),
+    expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : undefined
   });
 
   const loadPosts = async () => {
     if (!supabase) return;
     const { data } = await supabase
       .from('posts')
-      .select('*, comments(*), post_likes(user_id)')
+      .select('*, comments(*), post_likes(user_id), post_views(user_id)')
       .order('created_at', { ascending: false });
 
     const mappedPosts = (data || []).map(mapPostRow);
@@ -202,6 +207,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data } = await supabase
       .from('stories')
       .select('*')
+      .gt('expires_at', new Date().toISOString())
       .gte('created_at', cutoff)
       .order('created_at', { ascending: false });
 
@@ -299,6 +305,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const removeStory = (storyId: string) => {
+    setStories(prevStories => prevStories.filter(story => story.id !== storyId));
+  };
+
   useEffect(() => {
     if (!supabase || !user) return;
     const realtimeClient = supabase;
@@ -347,6 +357,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             caption: row.caption || '',
             likes: 0,
             likedBy: [],
+            views: 0,
             comments: [],
             timestamp: new Date(row.created_at).getTime()
           });
@@ -372,6 +383,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         { event: 'INSERT', schema: 'public', table: 'stories' },
         (payload) => {
           appendStory(mapStoryRow(payload.new as any));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'stories' },
+        (payload) => {
+          removeStory((payload.old as any).id);
         }
       )
       .subscribe();
@@ -734,7 +752,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         thumbnail_url: thumbnailUrl || null,
         caption
       })
-      .select('*, comments(*), post_likes(user_id)')
+      .select('*, comments(*), post_likes(user_id), post_views(user_id)')
       .single();
 
     if (error) throw new Error(error.message);
@@ -746,13 +764,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const text = values.text?.trim() || '';
     if (!text && !values.imageFile) {
-      throw new Error('Adicione texto ou imagem para publicar um story.');
+      throw new Error('Adicione texto ou imagem para publicar uma cena.');
     }
 
     let mediaUrl = '';
     if (values.imageFile) {
       const extension = values.imageFile.name.split('.').pop() || 'jpg';
-      const filePath = `${user.id}/story-${Date.now()}.${extension}`;
+      const filePath = `${user.id}/cena-${Date.now()}.${extension}`;
       const { error: uploadError } = await supabase.storage
         .from('story-media')
         .upload(filePath, values.imageFile, {
@@ -771,13 +789,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user_id: user.id,
         type: mediaUrl ? 'image' : 'text',
         media_url: mediaUrl || null,
-        text: text || null
+        text: text || null,
+        expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
       })
       .select()
       .single();
 
     if (error) throw new Error(error.message);
     if (data) appendStory(mapStoryRow(data));
+  };
+
+  const deleteStory = async (storyId: string) => {
+    if (!user || !supabase) return;
+    const story = stories.find(item => item.id === storyId);
+    if (story?.userId !== user.id) throw new Error('Voce so pode excluir suas proprias cenas.');
+
+    const { error } = await supabase.from('stories').delete().eq('id', storyId).eq('user_id', user.id);
+    if (error) throw new Error(error.message);
+
+    removeStory(storyId);
+  };
+
+  const recordPostView = async (postId: string) => {
+    if (!user || !supabase) return;
+    const post = posts.find(item => item.id === postId);
+    if (!post || post.userId === user.id) return;
+
+    const { error } = await supabase
+      .from('post_views')
+      .upsert({ post_id: postId, user_id: user.id }, { onConflict: 'post_id,user_id', ignoreDuplicates: true });
+
+    if (error) return;
+
+    setPosts(prevPosts => prevPosts.map(item => (
+      item.id === postId && !item.viewedByCurrentUser
+        ? { ...item, views: item.views + 1, viewedByCurrentUser: true }
+        : item
+    )));
+    setProfileUsers(prevProfiles => prevProfiles.map(profile => ({
+      ...profile,
+      posts: profile.posts?.map(item => (
+        item.id === postId && !item.viewedByCurrentUser
+          ? { ...item, views: item.views + 1, viewedByCurrentUser: true }
+          : item
+      ))
+    })));
+    setUser(prevUser => prevUser ? ({
+      ...prevUser,
+      posts: prevUser.posts?.map(item => (
+        item.id === postId && !item.viewedByCurrentUser
+          ? { ...item, views: item.views + 1, viewedByCurrentUser: true }
+          : item
+      ))
+    }) : prevUser);
   };
 
   const swipeMovie = async (movieId: string, direction: 'left' | 'right') => {
@@ -967,6 +1031,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toggleFollowUser,
     createPost,
     createStory,
+    deleteStory,
+    recordPostView,
     completeOnboarding,
     swipeMovie,
     getRecommendedMovies,

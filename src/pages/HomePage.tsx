@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type, Search } from 'lucide-react';
+import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type, Search, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { MOVIES } from '../data/mock';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,10 +8,16 @@ import { Post, Story } from '../types';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, posts, stories, addComment, toggleSavePost, toggleLikePost, profileUsers, getUserById } = useApp();
+  const { user, posts, stories, addComment, toggleSavePost, toggleLikePost, profileUsers, getUserById, createStory, deleteStory } = useApp();
   const [activeTab, setActiveTab] = useState('Community');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+  const [isComposingScene, setIsComposingScene] = useState(false);
+  const [sceneText, setSceneText] = useState('');
+  const [sceneImage, setSceneImage] = useState<File | null>(null);
+  const [scenePreview, setScenePreview] = useState('');
+  const [sceneError, setSceneError] = useState('');
+  const [isPublishingScene, setIsPublishingScene] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [profileSearch, setProfileSearch] = useState('');
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
@@ -20,6 +26,8 @@ export const HomePage: React.FC = () => {
     if (!latestStories.some(item => item.userId === story.userId)) latestStories.push(story);
     return latestStories;
   }, []);
+  const currentUserScene = latestStoriesByUser.find(story => story.userId === user?.id);
+  const otherUserScenes = latestStoriesByUser.filter(story => story.userId !== user?.id);
 
   const tabs = ['Feed', 'Community'];
   const searchTerm = profileSearch.trim().toLowerCase();
@@ -37,6 +45,46 @@ export const HomePage: React.FC = () => {
     if (liveSelectedPost && commentText.trim()) {
       addComment(liveSelectedPost.id, commentText);
       setCommentText('');
+    }
+  };
+
+  const handleSceneImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setSceneImage(file);
+    setScenePreview(URL.createObjectURL(file));
+  };
+
+  const resetSceneComposer = () => {
+    setSceneText('');
+    setSceneImage(null);
+    setScenePreview('');
+    setSceneError('');
+  };
+
+  const handlePublishScene = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSceneError('');
+    setIsPublishingScene(true);
+
+    try {
+      await createStory({ text: sceneText, imageFile: sceneImage });
+      resetSceneComposer();
+      setIsComposingScene(false);
+    } catch (error) {
+      setSceneError(error instanceof Error ? error.message : 'Nao foi possivel publicar a cena.');
+    } finally {
+      setIsPublishingScene(false);
+    }
+  };
+
+  const handleDeleteScene = async () => {
+    if (!selectedStory) return;
+    try {
+      await deleteStory(selectedStory.id);
+      setSelectedStory(null);
+    } catch (error) {
+      setSceneError(error instanceof Error ? error.message : 'Nao foi possivel excluir a cena.');
     }
   };
 
@@ -90,44 +138,80 @@ export const HomePage: React.FC = () => {
         </div>
 
         <div className="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide">
-          <div className="flex flex-col items-center space-y-2 min-w-[72px]">
-            <div className="relative w-[72px] h-[72px]">
-              <div className="w-full h-full rounded-[24px] border-2 border-dashed border-gray-600 p-1 flex items-center justify-center">
-                {user?.avatarUrl ? (
+          <div className="flex flex-col items-center space-y-2 min-w-[78px]">
+            <button
+              type="button"
+              onClick={() => {
+                if (currentUserScene) {
+                  setSelectedStory(currentUserScene);
+                } else {
+                  resetSceneComposer();
+                  setIsComposingScene(true);
+                }
+              }}
+              className="relative w-[78px] h-[78px]"
+            >
+              <div className="w-full h-full rounded-full border-2 border-dashed border-zinc-500 p-[3px] flex items-center justify-center">
+                <div className="w-full h-full rounded-full bg-[#222226] p-[2px] overflow-hidden">
+                  {currentUserScene?.type === 'image' && currentUserScene.mediaUrl ? (
+                    <img
+                      src={currentUserScene.mediaUrl}
+                      alt="Sua cena"
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : user?.avatarUrl ? (
                   <img
                     src={user.avatarUrl}
-                    alt="Seu story"
-                    className="w-full h-full rounded-[20px] object-cover opacity-50"
+                    alt="Sua cena"
+                    className="w-full h-full rounded-full object-cover opacity-80"
                   />
                 ) : (
-                  <div className="w-full h-full rounded-[20px] bg-[#222226] flex items-center justify-center text-zinc-500">
+                    <div className="w-full h-full rounded-full bg-[#222226] flex items-center justify-center text-zinc-500">
                     <Plus size={22} />
                   </div>
                 )}
+                </div>
               </div>
-              <div className="absolute bottom-0 right-0 bg-white text-black rounded-full p-1 translate-x-1 translate-y-1">
-                <Plus size={14} strokeWidth={3} />
-              </div>
-            </div>
-            <span className="text-xs text-gray-400 font-medium">Seu story</span>
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  resetSceneComposer();
+                  setIsComposingScene(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    resetSceneComposer();
+                    setIsComposingScene(true);
+                  }
+                }}
+                className="absolute bottom-1 right-0 bg-white text-black rounded-full p-1 shadow-lg"
+              >
+                <Plus size={16} strokeWidth={3} />
+              </span>
+            </button>
+            <span className="text-xs text-gray-400 font-medium">Sua cena</span>
           </div>
           
-          {latestStoriesByUser.map((story, index) => {
+          {otherUserScenes.map((story, index) => {
             const storyUser = getUserById(story.userId);
             if (!storyUser) return null;
 
             return (
-              <div key={story.id} className="flex flex-col items-center space-y-2 min-w-[72px] cursor-pointer" onClick={() => setSelectedStory(story)}>
-                <div className={`w-[72px] h-[72px] rounded-[24px] p-[2px] ${index % 2 === 0 ? 'bg-gradient-to-tr from-yellow-400 to-orange-500' : 'bg-gradient-to-tr from-green-400 to-blue-500'}`}>
-                <div className="w-full h-full rounded-[22px] bg-[#17171B] p-[2px]">
+              <div key={story.id} className="flex flex-col items-center space-y-2 min-w-[78px] cursor-pointer" onClick={() => setSelectedStory(story)}>
+                <div className={`w-[78px] h-[78px] rounded-full p-[3px] ${index % 2 === 0 ? 'bg-gradient-to-tr from-[#F7A3C5] via-[#9FC4FF] to-[#8D4B5C]' : 'bg-gradient-to-tr from-[#B4F8C8] via-[#A0E7E5] to-[#A18CD1]'}`}>
+                <div className="w-full h-full rounded-full bg-[#17171B] p-[3px]">
                   {story.type === 'image' && story.mediaUrl ? (
                     <img
                       src={story.mediaUrl}
                       alt={storyUser.name}
-                      className="w-full h-full rounded-[20px] object-cover"
+                      className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full rounded-[20px] bg-[#3F1521] p-2 flex items-center justify-center text-[10px] font-bold text-center line-clamp-3">
+                    <div className="w-full h-full rounded-full bg-[#3F1521] p-2 flex items-center justify-center text-[10px] font-bold text-center line-clamp-3">
                       {story.text || storyUser.name}
                     </div>
                   )}
@@ -349,6 +433,68 @@ export const HomePage: React.FC = () => {
       </div>
 
       <AnimatePresence>
+        {isComposingScene && (
+          <div className="fixed inset-0 z-[110] flex items-end justify-center md:items-center p-0 md:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsComposingScene(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.form
+              onSubmit={handlePublishScene}
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              className="relative w-full max-w-md rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#1F1F24] p-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-2xl font-bold">Nova cena</h2>
+                <button type="button" onClick={() => setIsComposingScene(false)} className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {scenePreview && (
+                <div className="mb-4 aspect-[9/16] max-h-[420px] overflow-hidden rounded-[26px] bg-black">
+                  <img src={scenePreview} alt="Preview da cena" className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              <textarea
+                value={sceneText}
+                onChange={(event) => setSceneText(event.target.value)}
+                className="w-full min-h-28 rounded-3xl bg-[#17171B] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25 resize-none"
+                placeholder="Texto da cena..."
+              />
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 rounded-full bg-zinc-800 px-4 py-3 text-sm font-medium cursor-pointer hover:bg-zinc-700">
+                  <Camera size={17} />
+                  Camera
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleSceneImageChange} />
+                </label>
+                <label className="flex items-center gap-2 rounded-full bg-zinc-800 px-4 py-3 text-sm font-medium cursor-pointer hover:bg-zinc-700">
+                  <ImageIcon size={17} />
+                  Galeria
+                  <input type="file" accept="image/*" className="hidden" onChange={handleSceneImageChange} />
+                </label>
+                <button
+                  type="submit"
+                  disabled={isPublishingScene}
+                  className="flex-1 min-w-[150px] h-12 rounded-full bg-[#3F1521] hover:bg-[#5B343C] disabled:opacity-60 text-white font-bold transition-colors"
+                >
+                  {isPublishingScene ? 'Publicando...' : 'Publicar cena'}
+                </button>
+              </div>
+              {sceneError && <p className="mt-3 text-sm text-red-300">{sceneError}</p>}
+            </motion.form>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {selectedStory && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div
@@ -370,8 +516,16 @@ export const HomePage: React.FC = () => {
               >
                 <X size={18} />
               </button>
+              {selectedStory.userId === user?.id && (
+                <button
+                  onClick={handleDeleteScene}
+                  className="absolute left-4 top-4 z-10 p-2 rounded-full bg-black/35 text-white hover:bg-red-500/80 transition-colors"
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
               {selectedStory.type === 'image' && selectedStory.mediaUrl ? (
-                <img src={selectedStory.mediaUrl} alt="Story" className="w-full h-full object-cover" />
+                <img src={selectedStory.mediaUrl} alt="Cena" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-[#3F1521] p-8 flex flex-col items-center justify-center text-center">
                   <Type size={30} className="mb-4 text-white/70" />
