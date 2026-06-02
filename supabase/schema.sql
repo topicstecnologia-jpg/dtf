@@ -5,6 +5,7 @@ create table if not exists public.profiles (
   name text not null,
   handle text not null,
   username_configured boolean not null default false,
+  onboarding_completed boolean not null default false,
   avatar_url text,
   cover_url text,
   bio text,
@@ -14,6 +15,7 @@ create table if not exists public.profiles (
   favorite_movies jsonb not null default '[]'::jsonb,
   matches jsonb not null default '[]'::jsonb,
   saved_posts jsonb not null default '[]'::jsonb,
+  following_ids jsonb not null default '[]'::jsonb,
   stats jsonb not null default '{"following":0,"followers":0,"creations":0}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -44,7 +46,7 @@ create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   movie_id text,
-  type text not null default 'image' check (type in ('image', 'video', 'repost')),
+  type text not null default 'image' check (type in ('image', 'video', 'repost', 'text')),
   thumbnail_url text,
   caption text,
   created_at timestamptz not null default now()
@@ -70,6 +72,18 @@ create table if not exists public.post_likes (
 alter table public.profiles
   add column if not exists username_configured boolean not null default false;
 
+alter table public.profiles
+  add column if not exists onboarding_completed boolean not null default false;
+
+alter table public.profiles
+  add column if not exists following_ids jsonb not null default '[]'::jsonb;
+
+alter table public.posts
+  drop constraint if exists posts_type_check;
+
+alter table public.posts
+  add constraint posts_type_check check (type in ('image', 'video', 'repost', 'text'));
+
 create unique index if not exists profiles_handle_unique_idx
   on public.profiles (lower(handle))
   where username_configured = true;
@@ -80,6 +94,10 @@ on conflict (id) do update set public = true;
 
 insert into storage.buckets (id, name, public)
 values ('chat-media', 'chat-media', true)
+on conflict (id) do update set public = true;
+
+insert into storage.buckets (id, name, public)
+values ('post-media', 'post-media', true)
 on conflict (id) do update set public = true;
 
 drop policy if exists "Avatar files are public" on storage.objects;
@@ -157,6 +175,33 @@ create policy "Users can update chat media for their matches"
     )
   );
 
+drop policy if exists "Post media files are public" on storage.objects;
+create policy "Post media files are public"
+  on storage.objects for select
+  using (bucket_id = 'post-media');
+
+drop policy if exists "Users can upload their post media" on storage.objects;
+create policy "Users can upload their post media"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'post-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users can update their post media" on storage.objects;
+create policy "Users can update their post media"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'post-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'post-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
@@ -169,6 +214,18 @@ begin
     )
   then
     alter publication supabase_realtime add table public.messages;
+  end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'posts'
+    )
+  then
+    alter publication supabase_realtime add table public.posts;
   end if;
 end;
 $$;
@@ -206,7 +263,7 @@ begin
     display_name,
     '@' || coalesce(nullif(normalized_handle, ''), 'usuario'),
     requested_handle is not null,
-    'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
+    '',
     'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
     'Apaixonado por cinema.'
   )

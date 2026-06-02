@@ -21,9 +21,11 @@ interface AppContextType {
   updatePassword: (password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateHandle: (handle: string) => Promise<void>;
-  updateProfile: (values: { name: string; handle: string; avatarFile?: File | null }) => Promise<void>;
+  updateProfile: (values: { name: string; handle: string; bio?: string; avatarFile?: File | null }) => Promise<void>;
   updateEmail: (email: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
+  toggleFollowUser: (targetUserId: string) => Promise<void>;
+  createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
   getUserById: (userId?: string) => User | undefined;
   completeOnboarding: (answers: Record<string, string>) => Promise<void>;
   swipeMovie: (movieId: string, direction: 'left' | 'right') => Promise<void>;
@@ -110,6 +112,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })));
   };
 
+  const mapPostRow = (row: any): Post => ({
+    id: row.id,
+    userId: row.user_id,
+    movieId: row.movie_id || undefined,
+    type: row.type,
+    thumbnailUrl: row.thumbnail_url || undefined,
+    caption: row.caption || '',
+    likes: row.post_likes?.length || 0,
+    likedBy: (row.post_likes || []).map((like: any) => like.user_id),
+    comments: (row.comments || []).map((comment: any) => ({
+      id: comment.id,
+      userId: comment.user_id,
+      userName: comment.user_name,
+      userAvatar: comment.user_avatar,
+      text: comment.text,
+      timestamp: new Date(comment.created_at).getTime()
+    })),
+    timestamp: new Date(row.created_at).getTime()
+  });
+
   const loadPosts = async () => {
     if (!supabase) return;
     const { data } = await supabase
@@ -117,25 +139,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .select('*, comments(*), post_likes(user_id)')
       .order('created_at', { ascending: false });
 
-    const mappedPosts = (data || []).map(row => ({
-      id: row.id,
-      userId: row.user_id,
-      movieId: row.movie_id || undefined,
-      type: row.type,
-      thumbnailUrl: row.thumbnail_url || undefined,
-      caption: row.caption || '',
-      likes: row.post_likes?.length || 0,
-      likedBy: (row.post_likes || []).map((like: any) => like.user_id),
-      comments: (row.comments || []).map((comment: any) => ({
-        id: comment.id,
-        userId: comment.user_id,
-        userName: comment.user_name,
-        userAvatar: comment.user_avatar,
-        text: comment.text,
-        timestamp: new Date(comment.created_at).getTime()
-      })),
-      timestamp: new Date(row.created_at).getTime()
-    }));
+    const mappedPosts = (data || []).map(mapPostRow);
 
     setPosts(mappedPosts);
   };
@@ -210,6 +214,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const appendPost = (post: Post) => {
+    setPosts(prevPosts => {
+      if (prevPosts.some(item => item.id === post.id)) return prevPosts;
+      return [post, ...prevPosts];
+    });
+  };
+
   useEffect(() => {
     if (!supabase || !user) return;
     const realtimeClient = supabase;
@@ -227,6 +238,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             text: row.text || undefined,
             mediaUrl: row.media_url || undefined,
             mediaType: row.media_type || undefined,
+            timestamp: new Date(row.created_at).getTime()
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      realtimeClient.removeChannel(channel);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!supabase || !user) return;
+    const realtimeClient = supabase;
+
+    const channel = realtimeClient
+      .channel(`posts:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'posts' },
+        (payload) => {
+          const row = payload.new as any;
+          appendPost({
+            id: row.id,
+            userId: row.user_id,
+            movieId: row.movie_id || undefined,
+            type: row.type,
+            thumbnailUrl: row.thumbnail_url || undefined,
+            caption: row.caption || '',
+            likes: 0,
+            likedBy: [],
+            comments: [],
             timestamp: new Date(row.created_at).getTime()
           });
         }
@@ -346,7 +389,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return data.publicUrl;
   };
 
-  const updateProfile = async (values: { name: string; handle: string; avatarFile?: File | null }) => {
+  const updateProfile = async (values: { name: string; handle: string; bio?: string; avatarFile?: File | null }) => {
     if (!user || !supabase) return;
 
     const normalizedHandle = normalizeHandle(values.handle);
@@ -370,6 +413,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...user,
       name: values.name.trim(),
       handle: normalizedHandle,
+      bio: values.bio ?? user.bio,
       avatarUrl,
       usernameConfigured: true
     };
@@ -379,6 +423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .update({
         name: updatedUser.name,
         handle: updatedUser.handle,
+        bio: updatedUser.bio,
         avatar_url: updatedUser.avatarUrl,
         username_configured: true
       })
@@ -392,6 +437,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .update({
           name: updatedUser.name,
           handle: updatedUser.handle,
+          bio: updatedUser.bio,
           avatar_url: updatedUser.avatarUrl
         })
         .eq('id', user.id);
@@ -490,7 +536,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (topTrait === 'dreamer') profile = 'Sonhador Nostalgico';
     if (topTrait === 'dramatic') profile = 'Coracao Dramatico';
 
-    const updatedUser = { ...user, emotionalProfile: profile };
+    const updatedUser = { ...user, emotionalProfile: profile, onboardingCompleted: true };
     setUser(updatedUser);
     await persistProfile(updatedUser);
     await loadProfiles();
@@ -522,6 +568,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     await loadMatches(currentUser.id);
+  };
+
+  const toggleFollowUser = async (targetUserId: string) => {
+    if (!user || !supabase || user.id === targetUserId) return;
+
+    const followingIds = user.followingIds || [];
+    const isFollowing = followingIds.includes(targetUserId);
+    const updatedFollowingIds = isFollowing
+      ? followingIds.filter(id => id !== targetUserId)
+      : [...followingIds, targetUserId];
+
+    const updatedUser = {
+      ...user,
+      followingIds: updatedFollowingIds,
+      stats: {
+        ...user.stats,
+        following: updatedFollowingIds.length
+      }
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        following_ids: updatedFollowingIds,
+        stats: updatedUser.stats
+      })
+      .eq('id', user.id);
+
+    if (error) throw new Error(error.message);
+
+    setUser(updatedUser);
+    setProfileUsers(prev => prev.map(profile => profile.id === user.id ? updatedUser : profile));
+  };
+
+  const createPost = async (values: { caption: string; imageFile?: File | null }) => {
+    if (!user || !supabase) return;
+
+    const caption = values.caption.trim();
+    if (!caption && !values.imageFile) {
+      throw new Error('Adicione texto ou imagem para publicar.');
+    }
+
+    let thumbnailUrl = '';
+    if (values.imageFile) {
+      const extension = values.imageFile.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/post-${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from('post-media')
+        .upload(filePath, values.imageFile, {
+          contentType: values.imageFile.type || undefined,
+          upsert: false
+        });
+
+      if (uploadError) throw new Error(uploadError.message);
+      const { data } = supabase.storage.from('post-media').getPublicUrl(filePath);
+      thumbnailUrl = data.publicUrl;
+    }
+
+    const { data, error } = await supabase
+      .from('posts')
+      .insert({
+        user_id: user.id,
+        type: thumbnailUrl ? 'image' : 'text',
+        thumbnail_url: thumbnailUrl || null,
+        caption
+      })
+      .select('*, comments(*), post_likes(user_id)')
+      .single();
+
+    if (error) throw new Error(error.message);
+    if (data) appendPost(mapPostRow(data));
   };
 
   const swipeMovie = async (movieId: string, direction: 'left' | 'right') => {
@@ -707,6 +824,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateProfile,
     updateEmail,
     deleteAccount,
+    toggleFollowUser,
+    createPost,
     completeOnboarding,
     swipeMovie,
     getRecommendedMovies,

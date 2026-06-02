@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Play, MessageCircle, User, AtSign } from 'lucide-react';
+import { Home, Play, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { motion } from 'framer-motion';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation();
-  const { user, updateHandle } = useApp();
+  const { user, updateHandle, createPost } = useApp();
   const [handleInput, setHandleInput] = useState(user?.handle?.replace(/^@/, '') || '');
   const [handleError, setHandleError] = useState('');
   const [isSavingHandle, setIsSavingHandle] = useState(false);
+  const [isComposingPost, setIsComposingPost] = useState(false);
+  const [postCaption, setPostCaption] = useState('');
+  const [postImage, setPostImage] = useState<File | null>(null);
+  const [postPreview, setPostPreview] = useState('');
+  const [postError, setPostError] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
 
   if (!user) {
     return <div className="min-h-screen bg-light-bg text-text-main">{children}</div>;
@@ -45,6 +51,31 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     }
   };
 
+  const handlePostImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPostImage(file);
+    setPostPreview(URL.createObjectURL(file));
+  };
+
+  const handlePublishPost = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setPostError('');
+    setIsPublishing(true);
+
+    try {
+      await createPost({ caption: postCaption, imageFile: postImage });
+      setPostCaption('');
+      setPostImage(null);
+      setPostPreview('');
+      setIsComposingPost(false);
+    } catch (error) {
+      setPostError(error instanceof Error ? error.message : 'Nao foi possivel publicar.');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#17171B] text-text-main">
       {!isChatPage && (
@@ -75,8 +106,42 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       {!isChatPage && (
-        <nav className="fixed bottom-5 left-5 right-5 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[380px] h-16 md:h-14 bg-[#222226]/90 backdrop-blur-xl rounded-full shadow-2xl flex items-center justify-between px-7 md:px-6 z-50 border border-white/10">
-          {navItems.map((item) => {
+        <nav className="fixed bottom-5 left-5 right-5 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[430px] h-16 md:h-14 bg-[#222226]/90 backdrop-blur-xl rounded-full shadow-2xl flex items-center justify-between px-5 md:px-5 z-50 border border-white/10">
+          {navItems.slice(0, 2).map((item) => {
+            const isActive = pathname === item.path;
+            return (
+              <MotionLink
+                key={item.path}
+                to={item.path}
+                className="relative flex items-center justify-center w-10 h-10 rounded-full"
+                whileTap={{ scale: 0.88 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="nav-background"
+                    className="absolute inset-0 bg-[#3F1521] rounded-full"
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <span className="relative z-10">
+                  <item.icon
+                    size={22}
+                    strokeWidth={isActive ? 2.5 : 2}
+                    className={isActive ? 'text-white' : 'text-gray-500'}
+                  />
+                </span>
+              </MotionLink>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setIsComposingPost(true)}
+            className="relative flex items-center justify-center w-12 h-12 rounded-full bg-white text-black shadow-lg"
+          >
+            <Plus size={24} strokeWidth={3} />
+          </button>
+          {navItems.slice(2).map((item) => {
             const isActive = pathname === item.path;
             return (
               <MotionLink
@@ -139,6 +204,53 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             >
               {isSavingHandle ? 'Salvando...' : 'Salvar @'}
             </button>
+          </motion.form>
+        </div>
+      )}
+
+      {isComposingPost && (
+        <div className="fixed inset-0 z-[125] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
+          <motion.form
+            onSubmit={handlePublishPost}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#1F1F24] p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-2xl font-bold">Nova publicacao</h2>
+              <button type="button" onClick={() => setIsComposingPost(false)} className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            {postPreview && (
+              <div className="mb-4 aspect-[1080/1450] overflow-hidden rounded-2xl bg-black">
+                <img src={postPreview} alt="Preview" className="w-full h-full object-cover" />
+              </div>
+            )}
+
+            <textarea
+              value={postCaption}
+              onChange={(event) => setPostCaption(event.target.value)}
+              className="w-full min-h-28 rounded-3xl bg-[#17171B] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25 resize-none"
+              placeholder="Escreva algo para o feed..."
+            />
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2 rounded-full bg-zinc-800 px-4 py-3 text-sm font-medium cursor-pointer hover:bg-zinc-700">
+                <ImageIcon size={17} />
+                Imagem
+                <input type="file" accept="image/*" className="hidden" onChange={handlePostImageChange} />
+              </label>
+              <button
+                type="submit"
+                disabled={isPublishing}
+                className="flex-1 h-12 rounded-full bg-[#3F1521] hover:bg-[#5B343C] disabled:opacity-60 text-white font-bold transition-colors"
+              >
+                {isPublishing ? 'Publicando...' : 'Publicar'}
+              </button>
+            </div>
+            {postError && <p className="mt-3 text-sm text-red-300">{postError}</p>}
           </motion.form>
         </div>
       )}

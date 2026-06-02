@@ -82,7 +82,7 @@ export const LoginPage: React.FC = () => {
       } else {
         await login(email, password);
       }
-      navigate('/onboarding');
+      navigate('/home');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Nao foi possivel autenticar.';
       if (message.includes('Confirme seu email')) {

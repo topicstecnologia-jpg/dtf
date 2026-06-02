@@ -23,7 +23,7 @@ export interface Post {
   id: string;
   userId: string;
   movieId?: string;
-  type: 'image' | 'video' | 'repost';
+  type: 'image' | 'video' | 'repost' | 'text';
   thumbnailUrl?: string;
   caption: string;
   likes: number;
@@ -37,6 +37,7 @@ export interface User {
   name: string;
   handle: string;
   usernameConfigured?: boolean;
+  onboardingCompleted?: boolean;
   avatarUrl: string;
   coverUrl?: string;
   bio?: string;
@@ -46,6 +47,7 @@ export interface User {
   favoriteMovies: string[];
   matches: string[];
   savedPosts: string[];
+  followingIds?: string[];
   stats: {
     following: number;
     followers: number;

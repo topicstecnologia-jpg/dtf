@@ -7,13 +7,14 @@ import { motion } from 'framer-motion';
 
 export const ProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount } = useApp();
+  const { user: currentUser, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount, toggleFollowUser } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'reposts' | 'favorites'>('images');
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editHandle, setEditHandle] = useState('');
+  const [editBio, setEditBio] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState('');
@@ -38,6 +39,7 @@ export const ProfilePage: React.FC = () => {
 
   const compatibility = match?.compatibility.overall || (isCurrentUser ? null : Math.floor(Math.random() * 20) + 75);
   const stats = profileUser.stats || { following: 0, followers: 0, creations: 0 };
+  const isFollowing = Boolean(currentUser?.followingIds?.includes(profileUser.id));
   const posts = profileUser.posts || [];
   const favoriteMovies = (profileUser.favoriteMovies || []).map(id => MOVIES.find(m => m.id === id)).filter(Boolean);
 
@@ -63,6 +65,7 @@ export const ProfilePage: React.FC = () => {
   const openEditProfile = () => {
     setEditName(profileUser.name);
     setEditHandle(profileUser.handle.replace(/^@/, ''));
+    setEditBio(profileUser.bio || '');
     setEditEmail('');
     setAvatarFile(null);
     setAvatarPreview(profileUser.avatarUrl);
@@ -85,7 +88,7 @@ export const ProfilePage: React.FC = () => {
     setEditSuccess('');
 
     try {
-      await updateProfile({ name: editName, handle: editHandle, avatarFile });
+      await updateProfile({ name: editName, handle: editHandle, bio: editBio, avatarFile });
       if (editEmail.trim()) {
         await updateEmail(editEmail.trim());
         setEditSuccess('Perfil salvo. Confirme o novo email na sua caixa de entrada.');
@@ -202,8 +205,12 @@ export const ProfilePage: React.FC = () => {
               <MessageCircle size={17} />
               Mensagem
             </button>
-            <button className="bg-zinc-800 text-white p-2.5 rounded-lg hover:bg-zinc-700 transition-colors">
+            <button
+              onClick={() => toggleFollowUser(profileUser.id)}
+              className="bg-zinc-800 text-white px-3 py-2.5 rounded-lg hover:bg-zinc-700 transition-colors flex items-center gap-2 text-sm font-medium"
+            >
               <UserPlus size={19} />
+              {isFollowing ? 'Seguindo' : 'Seguir'}
             </button>
             <button className="bg-zinc-800 text-white p-2.5 rounded-lg hover:bg-zinc-700 transition-colors">
               <ChevronDown size={19} />
@@ -373,6 +380,17 @@ export const ProfilePage: React.FC = () => {
                   onChange={(event) => setEditEmail(event.target.value)}
                   className="w-full rounded-full bg-[#17171B] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25"
                   placeholder="preencha apenas se quiser alterar"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300 ml-1">Bio</label>
+                <textarea
+                  value={editBio}
+                  onChange={(event) => setEditBio(event.target.value)}
+                  className="w-full min-h-28 rounded-3xl bg-[#17171B] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25 resize-none"
+                  placeholder="Conte um pouco sobre voce"
+                  maxLength={220}
                 />
               </div>
             </div>

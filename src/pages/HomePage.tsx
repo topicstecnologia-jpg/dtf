@@ -156,10 +156,20 @@ export const HomePage: React.FC = () => {
           <div className="space-y-5 md:max-w-[390px] md:mx-auto">
             {posts.map((post) => {
               const postUser = getUserById(post.userId) || user;
-              const postMovie = MOVIES.find(m => m.id === post.movieId);
+              const postMovie = MOVIES.find(m => m.id === post.movieId) || {
+                id: post.id,
+                title: post.thumbnailUrl ? 'Publicacao' : 'Texto',
+                year: new Date(post.timestamp).getFullYear(),
+                genres: post.type === 'text' ? ['Texto'] : ['Feed'],
+                description: post.caption,
+                posterUrl: post.thumbnailUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1080' height='1450' viewBox='0 0 1080 1450'%3E%3Crect width='1080' height='1450' fill='%2317171B'/%3E%3C/svg%3E",
+                platforms: [],
+                rating: 0,
+                moods: []
+              };
               const isSaved = user?.savedPosts.includes(post.id);
               
-              if (!postUser || !postMovie) return null;
+              if (!postUser) return null;
 
               return (
                 <motion.div 

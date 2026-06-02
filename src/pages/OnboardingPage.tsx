@@ -3,60 +3,57 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { ONBOARDING_QUESTIONS, MOVIES } from '../data/mock';
-import { ChevronRight, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
   const { completeOnboarding, profileUsers, user } = useApp();
-  
   const [phase, setPhase] = useState<'questions' | 'result' | 'movies' | 'matches'>('questions');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [swipedMovies, setSwipedMovies] = useState<string[]>([]);
-  const [calculatedProfile, setCalculatedProfile] = useState<string>('Romântico Idealista');
+  const [calculatedProfile, setCalculatedProfile] = useState<string>('Romantico Idealista');
 
   const profileDescriptions: Record<string, string> = {
-    'Romântico Idealista': 'Você acredita no poder transformador do amor e busca conexões profundas que transcendem o cotidiano.',
-    'Explorador Existencial': 'Sua jornada é marcada pela busca por significado e pela compreensão das complexidades da vida.',
-    'Amante de Histórias Intensas': 'Você se atrai por narrativas viscerais e personagens que vivem cada momento com paixão absoluta.',
-    'Sonhador Nostálgico': 'O passado e as memórias têm um lugar especial no seu coração, guiando sua busca por beleza.',
-    'Coração Dramático': 'Você abraça a montanha-russa das emoções humanas, encontrando beleza na vulnerabilidade.'
+    'Romantico Idealista': 'Voce acredita no poder transformador do amor e busca conexoes profundas que transcendem o cotidiano.',
+    'Explorador Existencial': 'Sua jornada e marcada pela busca por significado e pela compreensao das complexidades da vida.',
+    'Amante de Historias Intensas': 'Voce se atrai por narrativas viscerais e personagens que vivem cada momento com paixao absoluta.',
+    'Sonhador Nostalgico': 'O passado e as memorias tem um lugar especial no seu coracao, guiando sua busca por beleza.',
+    'Coracao Dramatico': 'Voce abraca a montanha-russa das emocoes humanas, encontrando beleza na vulnerabilidade.'
   };
 
-  // Questions Logic
   const question = ONBOARDING_QUESTIONS[currentQuestionIndex];
   const totalQuestions = ONBOARDING_QUESTIONS.length;
   const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
 
+  const calculateProfile = (nextAnswers: Record<string, string>) => {
+    const counts: Record<string, number> = {};
+    Object.values(nextAnswers).forEach((value) => {
+      counts[value] = (counts[value] || 0) + 1;
+    });
+
+    const topTrait = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'romantic';
+
+    if (topTrait === 'existential') return 'Explorador Existencial';
+    if (topTrait === 'intense') return 'Amante de Historias Intensas';
+    if (topTrait === 'dreamer') return 'Sonhador Nostalgico';
+    if (topTrait === 'dramatic') return 'Coracao Dramatico';
+    return 'Romantico Idealista';
+  };
+
   const handleOptionSelect = (value: string) => {
-    setAnswers(prev => ({ ...prev, [question.id]: value }));
-  };
+    const nextAnswers = { ...answers, [question.id]: value };
+    setAnswers(nextAnswers);
 
-  const handleNextQuestion = () => {
     if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-    } else {
-      // Calculate profile
-      const counts: Record<string, number> = {};
-      Object.values(answers).forEach((val: string) => {
-        counts[val] = (counts[val] || 0) + 1;
-      });
-      
-      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-      const topTrait = sorted[0]?.[0] || 'romantic';
-
-      let profile = 'Romântico Idealista';
-      if (topTrait === 'existential') profile = 'Explorador Existencial';
-      if (topTrait === 'intense') profile = 'Amante de Histórias Intensas';
-      if (topTrait === 'dreamer') profile = 'Sonhador Nostálgico';
-      if (topTrait === 'dramatic') profile = 'Coração Dramático';
-
-      setCalculatedProfile(profile);
-      setPhase('result');
+      setTimeout(() => setCurrentQuestionIndex(prev => prev + 1), 180);
+      return;
     }
+
+    setCalculatedProfile(calculateProfile(nextAnswers));
+    setTimeout(() => setPhase('result'), 180);
   };
 
-  // Movies Logic
   const recommendedMovies = MOVIES.slice(0, 3);
   const handleSwipe = (id: string) => {
     setSwipedMovies(prev => [...prev, id]);
@@ -65,7 +62,6 @@ export const OnboardingPage: React.FC = () => {
     }
   };
 
-  // Matches Logic
   const matchedUsers = profileUsers.filter(profile => profile.id !== user?.id).slice(0, 3);
 
   const handleFinish = async () => {
@@ -73,12 +69,10 @@ export const OnboardingPage: React.FC = () => {
     navigate('/home');
   };
 
-  // Render Functions
   const renderQuestions = () => (
     <div className="flex flex-col h-full p-6 max-w-md mx-auto w-full">
-      {/* Progress Bar */}
       <div className="w-full h-1 bg-[#2A2A30] rounded-full mb-8 mt-4">
-        <motion.div 
+        <motion.div
           className="h-full bg-[#3F1521] rounded-full"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
@@ -87,10 +81,10 @@ export const OnboardingPage: React.FC = () => {
       </div>
 
       <div className="flex-1 flex flex-col justify-center">
-        <h2 className="text-sm font-bold text-[#3F1521] mb-2 uppercase tracking-wider">
+        <h2 className="text-sm font-bold text-[#8D4B5C] mb-2 uppercase tracking-wider">
           Passo {currentQuestionIndex + 1}
         </h2>
-        <motion.p 
+        <motion.p
           key={question.id}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -108,8 +102,8 @@ export const OnboardingPage: React.FC = () => {
                 whileTap={{ scale: 0.98 }}
                 onClick={() => handleOptionSelect(option.value)}
                 className={`w-full p-5 rounded-2xl text-left transition-all border relative overflow-hidden ${
-                  isSelected 
-                    ? 'bg-[#3F1521] border-[#3F1521] text-white shadow-[0_0_15px_rgba(63,21,33,0.5)] bg-tech-pattern' 
+                  isSelected
+                    ? 'bg-[#3F1521] border-[#3F1521] text-white shadow-[0_0_15px_rgba(63,21,33,0.5)] bg-tech-pattern'
                     : 'bg-[#222226] border-white/5 text-gray-300 hover:bg-[#2A2A30]'
                 }`}
               >
@@ -122,37 +116,22 @@ export const OnboardingPage: React.FC = () => {
           })}
         </div>
       </div>
-
-      <div className="mt-8">
-        <button 
-          onClick={handleNextQuestion}
-          disabled={!answers[question.id]}
-          className="w-full flex items-center justify-center space-x-2 py-4 h-14 rounded-full bg-[#3F1521] hover:bg-[#5B343C] text-white font-bold shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(0,0,0,0.3)] disabled:opacity-50 disabled:shadow-none transition-all bg-tech-pattern btn-tech-glow border border-white/5"
-        >
-          <span>Próxima</span>
-          <ChevronRight size={20} />
-        </button>
-      </div>
     </div>
   );
 
   const renderResult = () => (
-    <div 
+    <div
       className="flex flex-col h-full items-center justify-center p-6 text-center cursor-pointer max-w-md mx-auto w-full"
       onClick={() => setPhase('movies')}
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="space-y-6"
-      >
-        <h2 className="text-2xl text-gray-400 font-light">Seu tipo de amor é</h2>
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="space-y-6">
+        <h2 className="text-2xl text-gray-400 font-light">Seu tipo de amor e</h2>
         <h1 className="text-5xl font-display font-bold text-white leading-tight">
-          {calculatedProfile.split(' ').map((word, i) => (
-            <React.Fragment key={i}>
+          {calculatedProfile.split(' ').map((word, index) => (
+            <React.Fragment key={index}>
               {word}
-              {i === 0 && calculatedProfile.split(' ').length > 1 && <br/>}
-              {i !== 0 && ' '}
+              {index === 0 && calculatedProfile.split(' ').length > 1 && <br />}
+              {index !== 0 && ' '}
             </React.Fragment>
           ))}
         </h1>
@@ -169,39 +148,24 @@ export const OnboardingPage: React.FC = () => {
   const renderMovies = () => (
     <div className="flex flex-col h-full items-center justify-center p-6 relative max-w-md mx-auto w-full">
       <h2 className="text-2xl font-bold text-white mb-12 text-center absolute top-12 z-10">
-        Filmes que combinam<br/>com você
+        Filmes que combinam<br />com voce
       </h2>
-      
+
       <div className="relative w-full max-w-[280px] aspect-[2/3] flex items-center justify-center" style={{ perspective: '1200px' }}>
         <AnimatePresence>
-          {recommendedMovies.filter(m => !swipedMovies.includes(m.id)).map((movie, index) => {
-             const isTop = index === 0;
-             return (
-               <SwipeCard 
-                 key={movie.id} 
-                 movie={movie} 
-                 index={index} 
-                 onSwipe={() => handleSwipe(movie.id)} 
-                 isTop={isTop}
-               />
-             );
-          }).reverse()} 
+          {recommendedMovies.filter(movie => !swipedMovies.includes(movie.id)).map((movie, index) => (
+            <SwipeCard key={movie.id} movie={movie} index={index} onSwipe={() => handleSwipe(movie.id)} isTop={index === 0} />
+          )).reverse()}
         </AnimatePresence>
       </div>
-      
-      <p className="text-gray-500 text-sm mt-12 absolute bottom-12">
-        Arraste para cima para jogar
-      </p>
+
+      <p className="text-gray-500 text-sm mt-12 absolute bottom-12">Arraste para cima para jogar</p>
     </div>
   );
 
   const renderMatches = () => (
     <div className="flex flex-col h-full items-center justify-center p-6 text-center max-w-md mx-auto w-full">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-8 w-full"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 w-full">
         <div>
           <h2 className="text-4xl font-display font-bold text-white mb-2">Deu Match!</h2>
           <p className="text-gray-400">Usuarios cadastrados que combinam com voce</p>
@@ -210,22 +174,22 @@ export const OnboardingPage: React.FC = () => {
         <div className="flex justify-center space-x-4 py-8">
           {matchedUsers.length === 0 ? (
             <p className="text-gray-500 text-sm">Ainda nao ha outros usuarios cadastrados.</p>
-          ) : matchedUsers.map((user, i) => (
-            <motion.div 
-              key={user.id}
+          ) : matchedUsers.map((matchedUser, index) => (
+            <motion.div
+              key={matchedUser.id}
               initial={{ opacity: 0, scale: 0 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.2 + 0.3 }}
+              transition={{ delay: index * 0.2 + 0.3 }}
               className="flex flex-col items-center space-y-3"
             >
               <div className="w-20 h-20 rounded-full p-[2px] bg-gradient-to-tr from-[#3F1521] to-pink-500 shadow-xl">
                 <div className="w-full h-full rounded-full p-[2px] bg-[#17171B]">
-                  <img src={user.avatarUrl} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                  <img src={matchedUser.avatarUrl} alt={matchedUser.name} className="w-full h-full rounded-full object-cover" />
                 </div>
               </div>
               <div className="flex flex-col items-center space-y-1">
-                <span className="text-white font-medium text-sm">{user.name.split(' ')[0]}</span>
-                <span className="text-[#3F1521] font-bold text-xs bg-[#3F1521]/10 px-2 py-0.5 rounded-full border border-[#3F1521]/20">
+                <span className="text-white font-medium text-sm">{matchedUser.name.split(' ')[0]}</span>
+                <span className="text-[#E4B5C2] font-bold text-xs bg-[#3F1521]/10 px-2 py-0.5 rounded-full border border-[#3F1521]/20">
                   {Math.floor(Math.random() * 15) + 80}%
                 </span>
               </div>
@@ -233,11 +197,11 @@ export const OnboardingPage: React.FC = () => {
           ))}
         </div>
 
-        <button 
+        <button
           onClick={handleFinish}
           className="w-full py-4 rounded-full bg-[#3F1521] hover:bg-[#5B343C] text-white font-bold shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(0,0,0,0.3)] transition-all mt-8 bg-tech-pattern btn-tech-glow border border-white/5 relative overflow-hidden"
         >
-          <span className="relative z-10">Começar a explorar</span>
+          <span className="relative z-10">Comecar a explorar</span>
         </button>
       </motion.div>
     </div>
@@ -263,13 +227,10 @@ export const OnboardingPage: React.FC = () => {
   );
 };
 
-// Subcomponent for Swipe Card
 const SwipeCard = ({ movie, index, onSwipe, isTop }: any) => {
   const y = useMotionValue(0);
   const rotate = useTransform(y, [-300, 0, 300], [-15, 0, 15]);
   const opacity = useTransform(y, [-300, -150, 0], [0, 0.5, 1]);
-  
-  // 3D Stack values
   const scale = 1 - index * 0.08;
   const z = -index * 60;
   const yOffset = -index * 30;
@@ -277,8 +238,8 @@ const SwipeCard = ({ movie, index, onSwipe, isTop }: any) => {
 
   return (
     <motion.div
-      style={{ 
-        y: isTop ? y : yOffset, 
+      style={{
+        y: isTop ? y : yOffset,
         rotate: isTop ? rotate : 0,
         zIndex: 10 - index,
         scale,
@@ -287,48 +248,31 @@ const SwipeCard = ({ movie, index, onSwipe, isTop }: any) => {
         opacity: isTop ? opacity : 1 - index * 0.25,
         transformStyle: 'preserve-3d'
       }}
-      drag={isTop ? "y" : false}
+      drag={isTop ? 'y' : false}
       dragConstraints={{ top: 0, bottom: 0 }}
       dragElastic={0.6}
       onDragEnd={(_, info) => {
-        if (info.offset.y < -100) {
-          onSwipe();
-        }
+        if (info.offset.y < -100) onSwipe();
       }}
       initial={{ scale: 0.8, opacity: 0, z: -200, y: 100 }}
-      animate={{ 
-        scale, 
-        opacity: 1 - index * 0.25, 
-        y: isTop ? 0 : yOffset,
-        z,
-        rotateX
-      }}
+      animate={{ scale, opacity: 1 - index * 0.25, y: isTop ? 0 : yOffset, z, rotateX }}
       exit={{ y: -500, opacity: 0, transition: { duration: 0.3 } }}
       className="absolute w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-[#222226] border border-white/10"
     >
-      {/* Shine Effect */}
       {isTop && (
-        <motion.div 
+        <motion.div
           className="absolute inset-0 z-20 pointer-events-none"
           initial={{ x: '-150%', skewX: -25 }}
           animate={{ x: '250%' }}
-          transition={{ 
-            duration: 1.8, 
-            delay: 0.8,
-            ease: "easeInOut",
-            repeat: Infinity,
-            repeatDelay: 2.5
-          }}
-          style={{
-            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)'
-          }}
+          transition={{ duration: 1.8, delay: 0.8, ease: 'easeInOut', repeat: Infinity, repeatDelay: 2.5 }}
+          style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)' }}
         />
       )}
 
       <img src={movie.posterUrl} alt={movie.title} className="w-full h-full object-cover" />
       <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-6 pt-20">
         <h3 className="text-white font-bold text-2xl">{movie.title}</h3>
-        <p className="text-gray-300 text-sm mt-1">{movie.year} • {movie.genres[0]}</p>
+        <p className="text-gray-300 text-sm mt-1">{movie.year} - {movie.genres[0]}</p>
       </div>
     </motion.div>
   );
