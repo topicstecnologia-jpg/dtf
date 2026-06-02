@@ -27,6 +27,8 @@ interface AppContextType {
   deleteAccount: () => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
+  updatePost: (postId: string, values: { caption: string }) => Promise<void>;
+  deletePost: (postId: string) => Promise<void>;
   createStory: (values: { text?: string; imageFile?: File | null }) => Promise<void>;
   deleteStory: (storyId: string) => Promise<void>;
   recordPostView: (postId: string) => Promise<void>;
@@ -342,6 +344,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStories(prevStories => prevStories.filter(story => story.id !== storyId));
   };
 
+  const updatePostEverywhere = (updatedPost: Post) => {
+    const updateList = (items?: Post[]) => items?.map(post => post.id === updatedPost.id ? { ...post, ...updatedPost } : post);
+
+    setPosts(prevPosts => prevPosts.map(post => post.id === updatedPost.id ? { ...post, ...updatedPost } : post));
+    setProfileUsers(prevProfiles => prevProfiles.map(profile => ({
+      ...profile,
+      posts: updateList(profile.posts)
+    })));
+    setUser(prevUser => prevUser ? { ...prevUser, posts: updateList(prevUser.posts) } : prevUser);
+  };
+
+  const patchPostEverywhere = (postId: string, patch: Partial<Post>) => {
+    const updateList = (items?: Post[]) => items?.map(post => post.id === postId ? { ...post, ...patch } : post);
+
+    setPosts(prevPosts => prevPosts.map(post => post.id === postId ? { ...post, ...patch } : post));
+    setProfileUsers(prevProfiles => prevProfiles.map(profile => ({
+      ...profile,
+      posts: updateList(profile.posts)
+    })));
+    setUser(prevUser => prevUser ? { ...prevUser, posts: updateList(prevUser.posts) } : prevUser);
+  };
+
+  const removePostEverywhere = (postId: string) => {
+    const removeFromList = (items?: Post[]) => items?.filter(post => post.id !== postId);
+
+    setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+    setProfileUsers(prevProfiles => prevProfiles.map(profile => {
+      const nextPosts = removeFromList(profile.posts) || [];
+      return {
+        ...profile,
+        posts: nextPosts,
+        stats: {
+          ...profile.stats,
+          creations: Math.min(profile.stats.creations || 0, nextPosts.length)
+        }
+      };
+    }));
+    setUser(prevUser => {
+      if (!prevUser) return prevUser;
+      const nextPosts = removeFromList(prevUser.posts) || [];
+      return {
+        ...prevUser,
+        posts: nextPosts,
+        stats: {
+          ...prevUser.stats,
+          creations: Math.min(prevUser.stats.creations || 0, nextPosts.length)
+        }
+      };
+    });
+  };
+
   useEffect(() => {
     if (!supabase || !user) return;
     const realtimeClient = supabase;
@@ -394,6 +447,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             comments: [],
             timestamp: new Date(row.created_at).getTime()
           });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'posts' },
+        (payload) => {
+          const row = payload.new as any;
+          patchPostEverywhere(row.id, {
+            movieId: row.movie_id || undefined,
+            type: row.type,
+            thumbnailUrl: row.thumbnail_url || undefined,
+            caption: row.caption || '',
+            timestamp: new Date(row.created_at).getTime()
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'posts' },
+        (payload) => {
+          removePostEverywhere((payload.old as any).id);
         }
       )
       .on(
@@ -802,6 +876,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data) appendPost(mapPostRow(data));
   };
 
+  const updatePost = async (postId: string, values: { caption: string }) => {
+    if (!user || !supabase) return;
+    const post = posts.find(item => item.id === postId);
+    if (!post || post.userId !== user.id) throw new Error('Voce so pode editar suas proprias postagens.');
+
+    const caption = values.caption.trim();
+    const { data, error } = await supabase
+      .from('posts')
+      .update({ caption })
+      .eq('id', postId)
+      .eq('user_id', user.id)
+      .select('*, comments(*), post_likes(user_id)')
+      .single();
+
+    if (error) throw new Error(error.message);
+    if (data) updatePostEverywhere({ ...post, ...mapPostRow(data), views: post.views, viewedByCurrentUser: post.viewedByCurrentUser });
+  };
+
+  const deletePost = async (postId: string) => {
+    if (!user || !supabase) return;
+    const post = posts.find(item => item.id === postId);
+    if (!post || post.userId !== user.id) throw new Error('Voce so pode excluir suas proprias postagens.');
+
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId)
+      .eq('user_id', user.id);
+
+    if (error) throw new Error(error.message);
+    removePostEverywhere(postId);
+  };
+
   const createStory = async (values: { text?: string; imageFile?: File | null }) => {
     if (!user || !supabase) return;
 
@@ -1079,6 +1186,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteAccount,
     toggleFollowUser,
     createPost,
+    updatePost,
+    deletePost,
     createStory,
     deleteStory,
     recordPostView,

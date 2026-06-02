@@ -445,6 +445,19 @@ create policy "Users can create their own posts"
   to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own posts" on public.posts;
+create policy "Users can update their own posts"
+  on public.posts for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can remove their own posts" on public.posts;
+create policy "Users can remove their own posts"
+  on public.posts for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
 drop policy if exists "Stories are visible to authenticated users" on public.stories;
 create policy "Stories are visible to authenticated users"
   on public.stories for select

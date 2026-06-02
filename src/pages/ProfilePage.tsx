@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { MOVIES } from '../data/mock';
-import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2, MoreHorizontal } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Post } from '../types';
 
 export const ProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount, toggleFollowUser, recordPostView } = useApp();
+  const { user: currentUser, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount, toggleFollowUser, recordPostView, updatePost, deletePost } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'reposts' | 'favorites'>('images');
   const [copied, setCopied] = useState(false);
@@ -21,6 +22,12 @@ export const ProfilePage: React.FC = () => {
   const [editError, setEditError] = useState('');
   const [editSuccess, setEditSuccess] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [isPostMenuOpen, setIsPostMenuOpen] = useState(false);
+  const [isEditingPost, setIsEditingPost] = useState(false);
+  const [editPostCaption, setEditPostCaption] = useState('');
+  const [postActionError, setPostActionError] = useState('');
+  const [isSavingPost, setIsSavingPost] = useState(false);
 
   const decodedParam = userId ? decodeURIComponent(userId) : '';
   const isCurrentUser = !userId || userId === currentUser?.id || decodedParam.toLowerCase() === currentUser?.handle?.toLowerCase();
@@ -41,6 +48,7 @@ export const ProfilePage: React.FC = () => {
   const stats = profileUser.stats || { following: 0, followers: 0, creations: 0 };
   const isFollowing = Boolean(currentUser?.followingIds?.includes(profileUser.id));
   const posts = profileUser.posts || [];
+  const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
   const favoriteMovies = (profileUser.favoriteMovies || []).map(id => MOVIES.find(m => m.id === id)).filter(Boolean);
   const loveTypeDescriptions: Record<string, string> = {
     'Sonhador Elegante': 'Conexao bonita, profunda e cheia de significado.',
@@ -132,6 +140,52 @@ export const ProfilePage: React.FC = () => {
     } catch (error) {
       setEditError(error instanceof Error ? error.message : 'Nao foi possivel excluir sua conta.');
       setIsSaving(false);
+    }
+  };
+
+  const openPost = (post: Post) => {
+    setSelectedPost(post);
+    setEditPostCaption(post.caption);
+    setIsPostMenuOpen(false);
+    setIsEditingPost(false);
+    setPostActionError('');
+  };
+
+  const handleSavePostCaption = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!liveSelectedPost) return;
+
+    setIsSavingPost(true);
+    setPostActionError('');
+
+    try {
+      await updatePost(liveSelectedPost.id, { caption: editPostCaption });
+      setIsEditingPost(false);
+      setIsPostMenuOpen(false);
+    } catch (error) {
+      setPostActionError(error instanceof Error ? error.message : 'Nao foi possivel editar a postagem.');
+    } finally {
+      setIsSavingPost(false);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!liveSelectedPost) return;
+    const confirmed = window.confirm('Excluir esta postagem? Essa acao nao pode ser desfeita.');
+    if (!confirmed) return;
+
+    setIsSavingPost(true);
+    setPostActionError('');
+
+    try {
+      await deletePost(liveSelectedPost.id);
+      setSelectedPost(null);
+      setIsPostMenuOpen(false);
+      setIsEditingPost(false);
+    } catch (error) {
+      setPostActionError(error instanceof Error ? error.message : 'Nao foi possivel excluir a postagem.');
+    } finally {
+      setIsSavingPost(false);
     }
   };
 
@@ -323,7 +377,12 @@ export const ProfilePage: React.FC = () => {
               const displayImage = post.thumbnailUrl || movie?.posterUrl;
 
               return (
-                <div key={post.id} className="aspect-[1080/1450] bg-zinc-900 relative overflow-hidden">
+                <button
+                  key={post.id}
+                  type="button"
+                  onClick={() => openPost(post)}
+                  className="aspect-[1080/1450] bg-zinc-900 relative overflow-hidden text-left"
+                >
                   {displayImage ? (
                     <img
                       src={displayImage}
@@ -344,7 +403,7 @@ export const ProfilePage: React.FC = () => {
                       <Repeat size={16} />
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
             {filteredPosts.length === 0 && (
@@ -356,6 +415,131 @@ export const ProfilePage: React.FC = () => {
           </>
         )}
       </div>
+
+      {liveSelectedPost && (
+        <div className="fixed inset-0 z-[125] bg-black/85 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] shadow-2xl"
+          >
+            <div className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 bg-[#17171B]/95 backdrop-blur-md z-10">
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate">{profileUser.handle}</p>
+                <p className="text-xs text-zinc-500">Postagem</p>
+              </div>
+              <div className="relative flex items-center gap-2">
+                {isCurrentUser && (
+                  <button
+                    type="button"
+                    onClick={() => setIsPostMenuOpen(prev => !prev)}
+                    className="p-2 rounded-full bg-white/5 text-zinc-300 hover:text-white"
+                  >
+                    <MoreHorizontal size={20} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPost(null);
+                    setIsPostMenuOpen(false);
+                    setIsEditingPost(false);
+                    setPostActionError('');
+                  }}
+                  className="p-2 rounded-full bg-white/5 text-zinc-300 hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+
+                {isPostMenuOpen && (
+                  <div className="absolute right-11 top-11 w-44 rounded-2xl border border-white/10 bg-[#222226] p-2 shadow-2xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditPostCaption(liveSelectedPost.caption);
+                        setIsEditingPost(true);
+                        setIsPostMenuOpen(false);
+                      }}
+                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-white hover:bg-white/5"
+                    >
+                      Editar legenda
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSavingPost}
+                      onClick={handleDeletePost}
+                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-300 hover:bg-red-500/10 disabled:opacity-60"
+                    >
+                      Excluir post
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(() => {
+              const movie = liveSelectedPost.movieId ? MOVIES.find(m => m.id === liveSelectedPost.movieId) : null;
+              const displayImage = liveSelectedPost.thumbnailUrl || movie?.posterUrl;
+
+              return displayImage ? (
+                <div className="aspect-[1080/1450] bg-zinc-900">
+                  <img src={displayImage} alt="Post" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="aspect-[1080/1450] bg-[#222226] p-8 flex items-center justify-center text-center">
+                  <p className="text-2xl font-bold leading-tight">{liveSelectedPost.caption}</p>
+                </div>
+              );
+            })()}
+
+            <div className="p-5 space-y-4">
+              <div className="flex items-center justify-between text-sm text-zinc-400">
+                <span className="flex items-center gap-1.5">
+                  <Play size={14} fill="currentColor" />
+                  {liveSelectedPost.views} visualizacoes
+                </span>
+                <span>{new Date(liveSelectedPost.timestamp).toLocaleDateString('pt-BR')}</span>
+              </div>
+
+              {isEditingPost ? (
+                <form onSubmit={handleSavePostCaption} className="space-y-3">
+                  <textarea
+                    value={editPostCaption}
+                    onChange={(event) => setEditPostCaption(event.target.value)}
+                    className="w-full min-h-28 rounded-3xl bg-[#222226] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25 resize-none"
+                    placeholder="Editar legenda"
+                  />
+                  {postActionError && <p className="text-sm text-red-300">{postActionError}</p>}
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingPost(false)}
+                      className="flex-1 h-11 rounded-full bg-zinc-800 text-white font-bold"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingPost}
+                      className="flex-1 h-11 rounded-full bg-[#3F1521] hover:bg-[#5B343C] disabled:opacity-60 text-white font-bold"
+                    >
+                      {isSavingPost ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <p className="text-sm leading-relaxed text-zinc-300">
+                    <span className="font-bold text-white mr-2">{profileUser.handle}</span>
+                    {liveSelectedPost.caption || 'Sem legenda.'}
+                  </p>
+                  {postActionError && <p className="text-sm text-red-300">{postActionError}</p>}
+                </>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {isEditing && (
         <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
