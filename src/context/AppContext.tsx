@@ -146,8 +146,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     caption: row.caption || '',
     likes: row.post_likes?.length || 0,
     likedBy: (row.post_likes || []).map((like: any) => like.user_id),
-    views: row.post_views?.length || 0,
-    viewedByCurrentUser: Boolean((row.post_views || []).some((view: any) => view.user_id === user?.id)),
+    views: row.views || 0,
+    viewedByCurrentUser: Boolean(row.viewed_by_current_user),
     comments: (row.comments || []).map((comment: any) => ({
       id: comment.id,
       userId: comment.user_id,
@@ -169,14 +169,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : undefined
   });
 
+  const hydratePostViews = async (mappedPosts: Post[]) => {
+    if (!supabase || mappedPosts.length === 0) return mappedPosts;
+
+    const postIds = mappedPosts.map(post => post.id);
+    const { data, error } = await supabase
+      .from('post_views')
+      .select('post_id, user_id')
+      .in('post_id', postIds);
+
+    if (error) return mappedPosts;
+
+    const viewsByPost = new Map<string, string[]>();
+    (data || []).forEach(view => {
+      const viewers = viewsByPost.get(view.post_id) || [];
+      viewers.push(view.user_id);
+      viewsByPost.set(view.post_id, viewers);
+    });
+
+    return mappedPosts.map(post => {
+      const viewers = viewsByPost.get(post.id) || [];
+      return {
+        ...post,
+        views: viewers.length,
+        viewedByCurrentUser: Boolean(user?.id && viewers.includes(user.id))
+      };
+    });
+  };
+
   const loadPosts = async () => {
     if (!supabase) return;
     const { data } = await supabase
       .from('posts')
-      .select('*, comments(*), post_likes(user_id), post_views(user_id)')
+      .select('*, comments(*), post_likes(user_id)')
       .order('created_at', { ascending: false });
 
-    const mappedPosts = (data || []).map(mapPostRow);
+    const mappedPosts = await hydratePostViews((data || []).map(mapPostRow));
 
     setPosts(mappedPosts);
     setProfileUsers(prev => prev.map(profile => ({
@@ -204,12 +232,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadStories = async () => {
     if (!supabase) return;
     const cutoff = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('stories')
       .select('*')
       .gt('expires_at', new Date().toISOString())
       .gte('created_at', cutoff)
       .order('created_at', { ascending: false });
+
+    if (error) {
+      setStories([]);
+      return;
+    }
 
     setStories((data || []).map(mapStoryRow));
   };
@@ -752,7 +785,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         thumbnail_url: thumbnailUrl || null,
         caption
       })
-      .select('*, comments(*), post_likes(user_id), post_views(user_id)')
+      .select('*, comments(*), post_likes(user_id)')
       .single();
 
     if (error) throw new Error(error.message);
@@ -795,7 +828,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      const needsSchema = error.message.toLowerCase().includes('schema cache') || error.message.toLowerCase().includes('stories');
+      throw new Error(needsSchema
+        ? 'A tabela de Cenas ainda nao existe no Supabase. Rode o supabase/schema.sql atualizado e tente novamente.'
+        : error.message
+      );
+    }
     if (data) appendStory(mapStoryRow(data));
   };
 

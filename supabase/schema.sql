@@ -504,3 +504,5 @@ create policy "Users can remove their own likes"
   on public.post_likes for delete
   to authenticated
   using (auth.uid() = user_id);
+
+notify pgrst, 'reload schema';
