@@ -1,194 +1,334 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment } from '../types';
-import { MOVIES, MOCK_USERS, MOCK_CHATS, MOCK_MATCHES } from '../data/mock';
+import { MOVIES } from '../data/mock';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { createDefaultProfile, mapProfileRowToUser, mapUserToProfileRow } from '../lib/profile';
 
 interface AppContextType {
   user: User | null;
+  profileUsers: User[];
   movies: Movie[];
   matches: Match[];
   chats: Chat[];
   posts: Post[];
   currentMovieIndex: number;
-  login: (name: string) => void;
-  completeOnboarding: (answers: Record<string, string>) => void;
-  swipeMovie: (movieId: string, direction: 'left' | 'right') => void;
+  isLoading: boolean;
+  authError: string;
+  login: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  getUserById: (userId?: string) => User | undefined;
+  completeOnboarding: (answers: Record<string, string>) => Promise<void>;
+  swipeMovie: (movieId: string, direction: 'left' | 'right') => Promise<void>;
   getRecommendedMovies: (mood: string) => Movie[];
-  sendMessage: (matchId: string, text?: string, media?: { url: string, type: 'image' | 'video' | 'audio' }) => void;
-  startChat: (targetUserId: string) => string;
-  addComment: (postId: string, text: string) => void;
-  toggleSavePost: (postId: string) => void;
-  toggleLikePost: (postId: string) => void;
+  sendMessage: (matchId: string, text?: string, media?: { url: string, type: 'image' | 'video' | 'audio' }) => Promise<void>;
+  startChat: (targetUserId: string) => Promise<string>;
+  addComment: (postId: string, text: string) => Promise<void>;
+  toggleSavePost: (postId: string) => Promise<void>;
+  toggleLikePost: (postId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [movies, setMovies] = useState<Movie[]>(MOVIES);
-  const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES);
-  const [chats, setChats] = useState<Chat[]>(MOCK_CHATS);
-  const [posts, setPosts] = useState<Post[]>([
-    {
-      id: 'p1',
-      userId: MOCK_USERS[0].id,
-      movieId: MOVIES[0].id,
-      type: 'image',
-      caption: "Acabei de assistir Her e estou sem palavras. A fotografia é incrível! 🥺❤️",
-      likes: 124,
-      likedBy: [],
-      comments: [
-        {
-          id: 'c1',
-          userId: MOCK_USERS[1].id,
-          userName: MOCK_USERS[1].name,
-          userAvatar: MOCK_USERS[1].avatarUrl,
-          text: "Filme sensacional! Uma das melhores atuações do Joaquin Phoenix.",
-          timestamp: Date.now() - 1000 * 60 * 30
-        }
-      ],
-      timestamp: Date.now() - 1000 * 60 * 60 * 2
-    },
-    {
-      id: 'p2',
-      userId: MOCK_USERS[1].id,
-      movieId: MOVIES[1].id,
-      type: 'image',
-      caption: "Multiverso da loucura real. Melhor filme do ano? Sim ou com certeza?",
-      likes: 89,
-      likedBy: [],
-      comments: [],
-      timestamp: Date.now() - 1000 * 60 * 60 * 4
-    },
-    {
-      id: 'p3',
-      userId: MOCK_USERS[2].id,
-      movieId: MOVIES[3].id,
-      type: 'image',
-      caption: "Interestelar me faz chorar toda vez. A trilha sonora do Hans Zimmer é de outro mundo.",
-      likes: 256,
-      likedBy: [],
-      comments: [],
-      timestamp: Date.now() - 1000 * 60 * 60 * 6
-    }
-  ]);
+  const [profileUsers, setProfileUsers] = useState<User[]>([]);
+  const [movies] = useState<Movie[]>(MOVIES);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [currentMovieIndex, setCurrentMovieIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState('');
 
-  const login = (name: string) => {
-    // Simulate login
-    setUser({
-      id: 'u1',
-      name,
-      handle: `@${name.toLowerCase().replace(/\s+/g, '_')}`,
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      coverUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
-      bio: 'Apaixonado por cinema e tecnologia. Sempre em busca da próxima obra-prima.',
-      emotionalProfile: '',
-      likedMovies: [],
-      dislikedMovies: [],
-      favoriteMovies: ['1', '2'],
-      matches: [],
-      savedPosts: [],
-      stats: {
-        following: 120,
-        followers: 45,
-        creations: 10
-      },
-      posts: [
-        { 
-          id: 'p_me_1', 
-          userId: 'me',
-          type: 'image', 
-          thumbnailUrl: 'https://images.unsplash.com/photo-1517604931442-71053644388d?auto=format&fit=crop&w=300&q=80',
-          caption: 'Meu primeiro post!',
-          likes: 0,
-          likedBy: [],
-          comments: [],
-          timestamp: Date.now()
-        }
-      ]
-    });
+  const getUserById = (userId?: string) => {
+    if (!userId) return undefined;
+    if (user?.id === userId) return user;
+    return profileUsers.find(profile => profile.id === userId);
   };
 
-  const completeOnboarding = (answers: Record<string, string>) => {
+  const persistProfile = async (profile: User) => {
+    if (!supabase) return;
+    await supabase.from('profiles').upsert(mapUserToProfileRow(profile), { onConflict: 'id' });
+  };
+
+  const loadProfiles = async () => {
+    if (!supabase) return [];
+    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    const profiles = (data || []).map(mapProfileRowToUser);
+    setProfileUsers(profiles);
+    return profiles;
+  };
+
+  const loadMatches = async (currentUserId: string) => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from('matches')
+      .select('*')
+      .or(`user_a.eq.${currentUserId},user_b.eq.${currentUserId}`)
+      .order('created_at', { ascending: true });
+
+    setMatches((data || []).map(row => ({
+      id: row.id,
+      userIds: [row.user_a, row.user_b],
+      compatibility: row.compatibility || { overall: 80, emotional: 75 },
+      commonMovies: row.common_movies || [],
+      timestamp: new Date(row.created_at).getTime()
+    })));
+  };
+
+  const loadMessages = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+    const grouped = new Map<string, Message[]>();
+
+    (data || []).forEach(row => {
+      const messagesForMatch = grouped.get(row.match_id) || [];
+      messagesForMatch.push({
+        id: row.id,
+        senderId: row.sender_id,
+        text: row.text || undefined,
+        mediaUrl: row.media_url || undefined,
+        mediaType: row.media_type || undefined,
+        timestamp: new Date(row.created_at).getTime()
+      });
+      grouped.set(row.match_id, messagesForMatch);
+    });
+
+    setChats(Array.from(grouped.entries()).map(([matchId, messages]) => ({
+      id: `chat-${matchId}`,
+      matchId,
+      messages
+    })));
+  };
+
+  const loadPosts = async () => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from('posts')
+      .select('*, comments(*), post_likes(user_id)')
+      .order('created_at', { ascending: false });
+
+    const mappedPosts = (data || []).map(row => ({
+      id: row.id,
+      userId: row.user_id,
+      movieId: row.movie_id || undefined,
+      type: row.type,
+      thumbnailUrl: row.thumbnail_url || undefined,
+      caption: row.caption || '',
+      likes: row.post_likes?.length || 0,
+      likedBy: (row.post_likes || []).map((like: any) => like.user_id),
+      comments: (row.comments || []).map((comment: any) => ({
+        id: comment.id,
+        userId: comment.user_id,
+        userName: comment.user_name,
+        userAvatar: comment.user_avatar,
+        text: comment.text,
+        timestamp: new Date(comment.created_at).getTime()
+      })),
+      timestamp: new Date(row.created_at).getTime()
+    }));
+
+    setPosts(mappedPosts);
+  };
+
+  const refreshAppData = async (currentUserId: string) => {
+    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadPosts()]);
+  };
+
+  const syncSession = async () => {
+    if (!supabase) {
+      setAuthError('Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY para ativar usuários reais.');
+      setIsLoading(false);
+      return;
+    }
+
+    const { data } = await supabase.auth.getSession();
+    const sessionUser = data.session?.user;
+
+    if (!sessionUser) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
+    let profiles = await loadProfiles();
+    let currentProfile = profiles.find(profile => profile.id === sessionUser.id);
+
+    if (!currentProfile) {
+      currentProfile = createDefaultProfile(
+        sessionUser.id,
+        sessionUser.email,
+        sessionUser.user_metadata?.name
+      );
+      await persistProfile(currentProfile);
+      profiles = await loadProfiles();
+    }
+
+    setUser(currentProfile);
+    setProfileUsers(profiles);
+    await refreshAppData(sessionUser.id);
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    syncSession();
+
+    if (!supabase) return;
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      syncSession();
+    });
+
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    if (!supabase) throw new Error('Supabase nao esta configurado.');
+    setAuthError('');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setAuthError(error.message);
+      throw error;
+    }
+    await syncSession();
+  };
+
+  const signUp = async (email: string, password: string, name?: string) => {
+    if (!supabase) throw new Error('Supabase nao esta configurado.');
+    setAuthError('');
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name: name || email.split('@')[0] } }
+    });
+
+    if (error) {
+      setAuthError(error.message);
+      throw error;
+    }
+
+    if (!data.session) {
+      const confirmationMessage = 'Cadastro criado. Confirme seu email antes de entrar.';
+      setAuthError(confirmationMessage);
+      throw new Error(confirmationMessage);
+    }
+
+    if (data.user) {
+      const profile = createDefaultProfile(data.user.id, email, name);
+      await persistProfile(profile);
+      setUser(profile);
+      await refreshAppData(data.user.id);
+    }
+  };
+
+  const logout = async () => {
+    if (supabase) await supabase.auth.signOut();
+    setUser(null);
+    setMatches([]);
+    setChats([]);
+    setPosts([]);
+  };
+
+  const completeOnboarding = async (answers: Record<string, string>) => {
     if (!user) return;
 
-    // Simple logic to determine profile based on answers
     const counts: Record<string, number> = {};
     Object.values(answers).forEach(val => {
       counts[val] = (counts[val] || 0) + 1;
     });
-    
+
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     const topTrait = sorted[0]?.[0] || 'romantic';
 
-    let profile: EmotionalProfileType = 'Romântico Idealista';
+    let profile: EmotionalProfileType = 'Romantico Idealista';
     if (topTrait === 'existential') profile = 'Explorador Existencial';
-    if (topTrait === 'intense') profile = 'Amante de Histórias Intensas';
-    if (topTrait === 'dreamer') profile = 'Sonhador Nostálgico';
-    if (topTrait === 'dramatic') profile = 'Coração Dramático';
+    if (topTrait === 'intense') profile = 'Amante de Historias Intensas';
+    if (topTrait === 'dreamer') profile = 'Sonhador Nostalgico';
+    if (topTrait === 'dramatic') profile = 'Coracao Dramatico';
 
-    setUser({ ...user, emotionalProfile: profile });
+    const updatedUser = { ...user, emotionalProfile: profile };
+    setUser(updatedUser);
+    await persistProfile(updatedUser);
+    await loadProfiles();
   };
 
-  const checkMatches = (currentUser: User, likedMovieId: string) => {
-    // Check if any mock user also liked this movie
-    MOCK_USERS.forEach(mockUser => {
-      // Logic: if they liked the same movie, it's a match for this demo
-      if (mockUser.likedMovies.includes(likedMovieId)) {
-        const newMatch: Match = {
-          id: `m-${Date.now()}-${mockUser.id}`,
-          userIds: [currentUser.id, mockUser.id],
-          compatibility: {
-            overall: Math.floor(Math.random() * 20) + 70,
-            emotional: Math.floor(Math.random() * 20) + 60
-          },
-          commonMovies: [likedMovieId],
-          timestamp: Date.now()
-        };
-        
-        setMatches(prev => {
-           if (prev.some(m => m.userIds.includes(mockUser.id))) return prev;
-           return [...prev, newMatch];
-        });
-      }
-    });
+  const checkMatches = async (currentUser: User, likedMovieId: string) => {
+    if (!supabase) return;
+    const profiles = await loadProfiles();
+    const matchedProfiles = profiles.filter(profile =>
+      profile.id !== currentUser.id && profile.likedMovies.includes(likedMovieId)
+    );
+
+    for (const profile of matchedProfiles) {
+      const existingMatch = matches.find(match => match.userIds.includes(profile.id));
+      if (existingMatch) continue;
+
+      const userIds = [currentUser.id, profile.id].sort();
+      const newMatch = {
+        user_a: userIds[0],
+        user_b: userIds[1],
+        compatibility: {
+          overall: Math.floor(Math.random() * 20) + 70,
+          emotional: Math.floor(Math.random() * 20) + 60
+        },
+        common_movies: [likedMovieId]
+      };
+
+      await supabase.from('matches').upsert(newMatch, { onConflict: 'user_a,user_b' });
+    }
+
+    await loadMatches(currentUser.id);
   };
 
-  const swipeMovie = (movieId: string, direction: 'left' | 'right') => {
+  const swipeMovie = async (movieId: string, direction: 'left' | 'right') => {
     if (!user) return;
 
+    const updatedUser = direction === 'right'
+      ? { ...user, likedMovies: Array.from(new Set([...user.likedMovies, movieId])) }
+      : { ...user, dislikedMovies: Array.from(new Set([...user.dislikedMovies, movieId])) };
+
+    setUser(updatedUser);
+    await persistProfile(updatedUser);
+
     if (direction === 'right') {
-      // Create a new user object with the liked movie
-      const updatedUser = { ...user, likedMovies: [...user.likedMovies, movieId] };
-      setUser(updatedUser);
-      // Check for matches with this new state
-      checkMatches(updatedUser, movieId);
-    } else {
-      setUser({ ...user, dislikedMovies: [...user.dislikedMovies, movieId] });
+      await checkMatches(updatedUser, movieId);
     }
-    
+
     setCurrentMovieIndex(prev => prev + 1);
   };
 
-  const getRecommendedMovies = (mood: string) => {
-    // Simple filter for now
-    return movies.filter(m => m.moods.some(mm => mood.toLowerCase().includes(mm)));
-  };
+  const getRecommendedMovies = (mood: string) => (
+    movies.filter(movie => movie.moods.some(movieMood => mood.toLowerCase().includes(movieMood)))
+  );
 
-  const sendMessage = (matchId: string, text?: string, media?: { url: string, type: 'image' | 'video' | 'audio' }) => {
-    if (!user) return;
+  const sendMessage = async (matchId: string, text?: string, media?: { url: string, type: 'image' | 'video' | 'audio' }) => {
+    if (!user || !supabase) return;
+
+    const { data } = await supabase
+      .from('messages')
+      .insert({
+        match_id: matchId,
+        sender_id: user.id,
+        text,
+        media_url: media?.url,
+        media_type: media?.type
+      })
+      .select()
+      .single();
+
+    if (!data) return;
 
     const newMessage: Message = {
-      id: `msg-${Date.now()}`,
+      id: data.id,
       senderId: user.id,
       text,
       mediaUrl: media?.url,
       mediaType: media?.type,
-      timestamp: Date.now()
+      timestamp: new Date(data.created_at).getTime()
     };
 
     setChats(prevChats => {
-      const chatIndex = prevChats.findIndex(c => c.matchId === matchId);
+      const chatIndex = prevChats.findIndex(chat => chat.matchId === matchId);
       if (chatIndex >= 0) {
         const updatedChats = [...prevChats];
         updatedChats[chatIndex] = {
@@ -196,49 +336,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           messages: [...updatedChats[chatIndex].messages, newMessage]
         };
         return updatedChats;
-      } else {
-        // Create new chat if it doesn't exist
-        return [...prevChats, {
-          id: `c-${Date.now()}`,
-          matchId,
-          messages: [newMessage]
-        }];
       }
+
+      return [...prevChats, { id: `chat-${matchId}`, matchId, messages: [newMessage] }];
     });
   };
 
-  const startChat = (targetUserId: string): string => {
-    if (!user) return '';
+  const startChat = async (targetUserId: string): Promise<string> => {
+    if (!user || !supabase) return '';
 
-    // Check if match exists
-    const existingMatch = matches.find(m => m.userIds.includes(user.id) && m.userIds.includes(targetUserId));
-    
-    if (existingMatch) {
-      return existingMatch.id;
-    }
+    const existingMatch = matches.find(match =>
+      match.userIds.includes(user.id) && match.userIds.includes(targetUserId)
+    );
 
-    // Create new match for chat
-    const newMatchId = `m-${Date.now()}-${targetUserId}`;
-    const newMatch: Match = {
-      id: newMatchId,
-      userIds: [user.id, targetUserId],
-      compatibility: {
-        overall: 85,
-        emotional: 80
-      },
-      commonMovies: [],
-      timestamp: Date.now()
-    };
+    if (existingMatch) return existingMatch.id;
 
-    setMatches(prev => [...prev, newMatch]);
-    return newMatchId;
+    const userIds = [user.id, targetUserId].sort();
+    const { data } = await supabase
+      .from('matches')
+      .upsert({
+        user_a: userIds[0],
+        user_b: userIds[1],
+        compatibility: { overall: 85, emotional: 80 },
+        common_movies: []
+      }, { onConflict: 'user_a,user_b' })
+      .select()
+      .single();
+
+    if (!data) return '';
+    await loadMatches(user.id);
+    return data.id;
   };
 
-  const addComment = (postId: string, text: string) => {
-    if (!user) return;
+  const addComment = async (postId: string, text: string) => {
+    if (!user || !supabase) return;
 
     const newComment: Comment = {
-      id: `c-${Date.now()}`,
+      id: crypto.randomUUID(),
       userId: user.id,
       userName: user.name,
       userAvatar: user.avatarUrl,
@@ -246,72 +380,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timestamp: Date.now()
     };
 
-    setPosts(prevPosts => {
-      const updatedPosts = prevPosts.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            comments: [...post.comments, newComment]
-          };
-        }
-        return post;
-      });
-      return updatedPosts;
+    await supabase.from('comments').insert({
+      id: newComment.id,
+      post_id: postId,
+      user_id: user.id,
+      user_name: user.name,
+      user_avatar: user.avatarUrl,
+      text
     });
+
+    setPosts(prevPosts => prevPosts.map(post => (
+      post.id === postId ? { ...post, comments: [...post.comments, newComment] } : post
+    )));
   };
 
-  const toggleSavePost = (postId: string) => {
-    if (!user) return;
+  const toggleSavePost = async (postId: string) => {
+    if (!user || !supabase) return;
 
     const isSaved = user.savedPosts.includes(postId);
-    const updatedSavedPosts = isSaved 
-      ? user.savedPosts.filter(id => id !== postId)
-      : [...user.savedPosts, postId];
+    const updatedUser = {
+      ...user,
+      savedPosts: isSaved
+        ? user.savedPosts.filter(id => id !== postId)
+        : [...user.savedPosts, postId]
+    };
 
-    setUser({ ...user, savedPosts: updatedSavedPosts });
+    setUser(updatedUser);
+    await persistProfile(updatedUser);
   };
 
-  const toggleLikePost = (postId: string) => {
-    if (!user) return;
+  const toggleLikePost = async (postId: string) => {
+    if (!user || !supabase) return;
+    const post = posts.find(item => item.id === postId);
+    if (!post) return;
 
-    setPosts(prevPosts => prevPosts.map(post => {
-      if (post.id === postId) {
-        const isLiked = post.likedBy.includes(user.id);
-        const updatedLikedBy = isLiked 
-          ? post.likedBy.filter(id => id !== user.id)
-          : [...post.likedBy, user.id];
-        
-        return {
-          ...post,
-          likedBy: updatedLikedBy,
-          likes: isLiked ? post.likes - 1 : post.likes + 1
-        };
-      }
-      return post;
+    const isLiked = post.likedBy.includes(user.id);
+
+    if (isLiked) {
+      await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+    } else {
+      await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
+    }
+
+    setPosts(prevPosts => prevPosts.map(item => {
+      if (item.id !== postId) return item;
+      const likedBy = isLiked ? item.likedBy.filter(id => id !== user.id) : [...item.likedBy, user.id];
+      return { ...item, likedBy, likes: likedBy.length };
     }));
   };
 
-  return (
-    <AppContext.Provider value={{ 
-      user, 
-      movies, 
-      matches, 
-      chats,
-      posts,
-      currentMovieIndex, 
-      login, 
-      completeOnboarding, 
-      swipeMovie,
-      getRecommendedMovies,
-      sendMessage,
-      startChat,
-      addComment,
-      toggleSavePost,
-      toggleLikePost
-    }}>
-      {children}
-    </AppContext.Provider>
-  );
+  const value = useMemo(() => ({
+    user,
+    profileUsers,
+    movies,
+    matches,
+    chats,
+    posts,
+    currentMovieIndex,
+    isLoading,
+    authError,
+    login,
+    signUp,
+    logout,
+    getUserById,
+    completeOnboarding,
+    swipeMovie,
+    getRecommendedMovies,
+    sendMessage,
+    startChat,
+    addComment,
+    toggleSavePost,
+    toggleLikePost
+  }), [user, profileUsers, movies, matches, chats, posts, currentMovieIndex, isLoading, authError]);
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
 export const useApp = () => {

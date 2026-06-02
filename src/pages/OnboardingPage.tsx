@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { ONBOARDING_QUESTIONS, MOVIES, MOCK_USERS } from '../data/mock';
+import { ONBOARDING_QUESTIONS, MOVIES } from '../data/mock';
 import { ChevronRight, Check } from 'lucide-react';
 
 export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
-  const { completeOnboarding } = useApp();
+  const { completeOnboarding, profileUsers, user } = useApp();
   
   const [phase, setPhase] = useState<'questions' | 'result' | 'movies' | 'matches'>('questions');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -66,10 +66,10 @@ export const OnboardingPage: React.FC = () => {
   };
 
   // Matches Logic
-  const matchedUsers = MOCK_USERS.slice(0, 3);
+  const matchedUsers = profileUsers.filter(profile => profile.id !== user?.id).slice(0, 3);
 
-  const handleFinish = () => {
-    completeOnboarding(answers);
+  const handleFinish = async () => {
+    await completeOnboarding(answers);
     navigate('/home');
   };
 
@@ -204,11 +204,13 @@ export const OnboardingPage: React.FC = () => {
       >
         <div>
           <h2 className="text-4xl font-display font-bold text-white mb-2">Deu Match!</h2>
-          <p className="text-gray-400">Usuários que combinam com você</p>
+          <p className="text-gray-400">Usuarios cadastrados que combinam com voce</p>
         </div>
 
         <div className="flex justify-center space-x-4 py-8">
-          {matchedUsers.map((user, i) => (
+          {matchedUsers.length === 0 ? (
+            <p className="text-gray-500 text-sm">Ainda nao ha outros usuarios cadastrados.</p>
+          ) : matchedUsers.map((user, i) => (
             <motion.div 
               key={user.id}
               initial={{ opacity: 0, scale: 0 }}

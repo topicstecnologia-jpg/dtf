@@ -17,7 +17,8 @@ import { HomePage } from './pages/HomePage';
 import { SplashScreen } from './components/SplashScreen';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useApp();
+  const { user, isLoading } = useApp();
+  if (isLoading) return <SplashScreen />;
   if (!user) return <Navigate to="/" replace />;
   return <Layout>{children}</Layout>;
 };
@@ -41,7 +42,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/" element={<LoginPage />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
           
           <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
@@ -54,4 +55,3 @@ export default function App() {
     </AppProvider>
   );
 }
-

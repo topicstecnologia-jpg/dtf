@@ -69,7 +69,11 @@ export type EmotionalProfileType =
   | 'Explorador Existencial'
   | 'Amante de Histórias Intensas'
   | 'Sonhador Nostálgico'
-  | 'Coração Dramático';
+  | 'Coração Dramático'
+  | 'Romantico Idealista'
+  | 'Amante de Historias Intensas'
+  | 'Sonhador Nostalgico'
+  | 'Coracao Dramatico';
 
 export interface Question {
   id: string;

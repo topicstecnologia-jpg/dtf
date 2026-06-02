@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark } from 'lucide-react';
-import { MOCK_USERS, MOVIES } from '../data/mock';
+import { MOVIES } from '../data/mock';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Post } from '../types';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, posts, addComment, toggleSavePost, toggleLikePost } = useApp();
+  const { user, posts, addComment, toggleSavePost, toggleLikePost, profileUsers, getUserById } = useApp();
   const [activeTab, setActiveTab] = useState('Community');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [commentText, setCommentText] = useState('');
@@ -46,7 +46,7 @@ export const HomePage: React.FC = () => {
           </div>
           
           {/* Other Stories */}
-          {MOCK_USERS.map((u, index) => (
+          {profileUsers.filter((profile) => profile.id !== user?.id).map((u, index) => (
             <div key={u.id} className="flex flex-col items-center space-y-2 min-w-[72px] cursor-pointer" onClick={() => navigate(`/profile/${u.id}`)}>
               <div className={`w-[72px] h-[72px] rounded-[24px] p-[2px] ${index % 2 === 0 ? 'bg-gradient-to-tr from-yellow-400 to-orange-500' : 'bg-gradient-to-tr from-green-400 to-blue-500'}`}>
                 <div className="w-full h-full rounded-[22px] bg-[#17171B] p-[2px]">
@@ -106,19 +106,19 @@ export const HomePage: React.FC = () => {
                  {/* Avatar Cluster */}
                  <div className="relative w-64 h-64">
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-20">
-                      <img src={MOCK_USERS[0 % MOCK_USERS.length].avatarUrl} className="w-full h-full object-cover" />
+                      <img src={(profileUsers[0] || user)?.avatarUrl} className="w-full h-full object-cover" />
                     </div>
                     <div className="absolute top-12 left-4 w-20 h-20 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-10">
-                      <img src={MOCK_USERS[1 % MOCK_USERS.length].avatarUrl} className="w-full h-full object-cover" />
+                      <img src={(profileUsers[1] || user)?.avatarUrl} className="w-full h-full object-cover" />
                     </div>
                     <div className="absolute top-12 right-4 w-20 h-20 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-10">
-                      <img src={MOCK_USERS[2 % MOCK_USERS.length].avatarUrl} className="w-full h-full object-cover" />
+                      <img src={(profileUsers[2] || user)?.avatarUrl} className="w-full h-full object-cover" />
                     </div>
                     <div className="absolute bottom-4 left-10 w-16 h-16 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-30">
-                      <img src={MOCK_USERS[3 % MOCK_USERS.length].avatarUrl} className="w-full h-full object-cover" />
+                      <img src={(profileUsers[3] || user)?.avatarUrl} className="w-full h-full object-cover" />
                     </div>
                     <div className="absolute bottom-4 right-10 w-16 h-16 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-30">
-                      <img src={MOCK_USERS[4 % MOCK_USERS.length].avatarUrl} className="w-full h-full object-cover" />
+                      <img src={(profileUsers[4] || user)?.avatarUrl} className="w-full h-full object-cover" />
                     </div>
                  </div>
               </div>
@@ -155,7 +155,7 @@ export const HomePage: React.FC = () => {
           /* Feed Content */
           <div className="space-y-6">
             {posts.map((post) => {
-              const postUser = MOCK_USERS.find(u => u.id === post.userId) || user;
+              const postUser = getUserById(post.userId) || user;
               const postMovie = MOVIES.find(m => m.id === post.movieId);
               const isSaved = user?.savedPosts.includes(post.id);
               

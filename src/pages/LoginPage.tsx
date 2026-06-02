@@ -7,91 +7,90 @@ import { Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useApp();
+  const { login, signUp, authError } = useApp();
   const [step, setStep] = useState(1);
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [localError, setLocalError] = useState('');
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1 && email) {
       setStep(2);
     } else if (step === 2 && password) {
-      handleLogin();
+      handleAuth();
     }
   };
 
   const handleBack = () => {
-    if (step === 2) {
-      setStep(1);
-    }
+    if (step === 2) setStep(1);
   };
 
-  const handleLogin = () => {
+  const handleAuth = async () => {
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      // Extract name from email for demo purposes
-      const name = email.split('@')[0] || 'Usuário';
-      login(name.charAt(0).toUpperCase() + name.slice(1));
-      setIsLoading(false);
+    setLocalError('');
+
+    try {
+      if (mode === 'signup') {
+        await signUp(email, password, name);
+      } else {
+        await login(email, password);
+      }
       navigate('/onboarding');
-    }, 1500);
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Nao foi possivel autenticar.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#17171B] flex flex-col items-center justify-between p-6 relative overflow-hidden text-white">
-      {/* Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=2000&q=80')] bg-cover bg-center opacity-20 blur-sm mix-blend-overlay pointer-events-none" />
-      
-      {/* Logo Area - Top */}
+
       <div className="flex-1 flex flex-col justify-center w-full z-10 max-w-md mx-auto">
-        <motion.div 
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={{
             hidden: { opacity: 0, y: 30 },
-            visible: { 
-              opacity: 1, 
+            visible: {
+              opacity: 1,
               y: 0,
-              transition: {
-                staggerChildren: 0.2,
-                duration: 0.8,
-                ease: [0.22, 1, 0.36, 1] // Custom ease for "fluid" feel
-              }
+              transition: { staggerChildren: 0.2, duration: 0.8, ease: [0.22, 1, 0.36, 1] }
             }
           }}
           className="text-left"
         >
-          <motion.img 
+          <motion.img
             variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
-            src="https://i.postimg.cc/GpHmXR5D/Design-sem-nome.png" 
-            alt="DTF Logo" 
+            src="https://i.postimg.cc/GpHmXR5D/Design-sem-nome.png"
+            alt="DTF Logo"
             className="w-40 h-auto mb-8 drop-shadow-2xl"
           />
-          <motion.h1 
+          <motion.h1
             variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
             className="text-4xl font-bold font-display mb-3"
           >
-            Bem-vindo
+            {mode === 'signup' ? 'Criar conta' : 'Bem-vindo'}
           </motion.h1>
-          <motion.p 
+          <motion.p
             variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
             className="text-gray-400 text-lg"
           >
-            Entre para continuar
+            {mode === 'signup' ? 'Cadastre-se para entrar' : 'Entre para continuar'}
           </motion.p>
         </motion.div>
       </div>
 
-      {/* Input Area - Bottom Sheet Style */}
-      <motion.div 
+      <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ type: "spring", damping: 20, stiffness: 100 }}
+        transition={{ type: 'spring', damping: 20, stiffness: 100 }}
         className="w-full max-w-md z-20 mb-8"
       >
         <form onSubmit={handleNext} className="space-y-6">
@@ -107,8 +106,8 @@ export const LoginPage: React.FC = () => {
               >
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-300 ml-1">Email</label>
-                  <input 
-                    type="email" 
+                  <input
+                    type="email"
                     required
                     autoFocus
                     value={email}
@@ -117,6 +116,18 @@ export const LoginPage: React.FC = () => {
                     placeholder="seu@email.com"
                   />
                 </div>
+                {mode === 'signup' && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-300 ml-1">Nome</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full px-6 py-4 rounded-full bg-[#222226] border border-gray-700 text-white focus:border-wine-900 focus:ring-1 focus:ring-wine-900 outline-none transition-all placeholder-gray-600"
+                      placeholder="Seu nome"
+                    />
+                  </div>
+                )}
               </motion.div>
             ) : (
               <motion.div
@@ -135,16 +146,16 @@ export const LoginPage: React.FC = () => {
                     </button>
                   </div>
                   <div className="relative">
-                    <input 
-                      type={showPassword ? "text" : "password"} 
+                    <input
+                      type={showPassword ? 'text' : 'password'}
                       required
                       autoFocus
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full px-6 py-4 rounded-full bg-[#222226] border border-gray-700 text-white focus:border-wine-900 focus:ring-1 focus:ring-wine-900 outline-none transition-all pr-12 placeholder-gray-600"
-                      placeholder="••••••••"
+                      placeholder="********"
                     />
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
@@ -152,18 +163,17 @@ export const LoginPage: React.FC = () => {
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                   </div>
-                  <div className="flex justify-end">
-                    <button type="button" className="text-xs text-gray-400 hover:text-white font-medium">
-                      Esqueceu a senha?
-                    </button>
-                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <Button 
-            type="submit" 
+          {(localError || authError) && (
+            <p className="text-sm text-red-300 text-center">{localError || authError}</p>
+          )}
+
+          <Button
+            type="submit"
             variant="primary"
             className="w-full h-14 rounded-full font-bold text-lg shadow-[inset_0_1px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(0,0,0,0.3)] flex items-center justify-center space-x-2 bg-tech-pattern btn-tech-glow border border-white/5 relative overflow-hidden"
             disabled={isLoading}
@@ -172,7 +182,7 @@ export const LoginPage: React.FC = () => {
               <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                <span className="relative z-10">{step === 1 ? 'Continuar' : 'Entrar'}</span>
+                <span className="relative z-10">{step === 1 ? 'Continuar' : mode === 'signup' ? 'Criar conta' : 'Entrar'}</span>
                 {step === 1 && <ArrowRight size={20} className="relative z-10" />}
               </>
             )}
@@ -181,9 +191,17 @@ export const LoginPage: React.FC = () => {
 
         <div className="mt-8 text-center">
           <p className="text-gray-500 text-sm">
-            Não tem uma conta?{' '}
-            <button className="text-white font-bold hover:underline">
-              Criar conta
+            {mode === 'login' ? 'Nao tem uma conta?' : 'Ja tem uma conta?'}{' '}
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === 'login' ? 'signup' : 'login');
+                setStep(1);
+                setLocalError('');
+              }}
+              className="text-white font-bold hover:underline"
+            >
+              {mode === 'login' ? 'Criar conta' : 'Entrar'}
             </button>
           </p>
         </div>

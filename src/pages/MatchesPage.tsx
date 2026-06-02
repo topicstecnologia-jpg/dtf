@@ -1,11 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { MOCK_USERS } from '../data/mock';
 import { MessageCircle, Search } from 'lucide-react';
 
 export const MatchesPage: React.FC = () => {
-  const { matches, user } = useApp();
+  const { matches, user, getUserById } = useApp();
   const navigate = useNavigate();
 
   return (
@@ -29,7 +28,7 @@ export const MatchesPage: React.FC = () => {
           ) : (
             matches.map((match) => {
               const otherUserId = match.userIds.find(id => id !== user?.id);
-              const otherUser = MOCK_USERS.find(u => u.id === otherUserId);
+              const otherUser = getUserById(otherUserId);
               if (!otherUser) return null;
               
               return (
@@ -67,7 +66,7 @@ export const MatchesPage: React.FC = () => {
           <div className="space-y-2">
             {matches.map((match) => {
               const otherUserId = match.userIds.find(id => id !== user?.id);
-              const otherUser = MOCK_USERS.find(u => u.id === otherUserId);
+              const otherUser = getUserById(otherUserId);
               if (!otherUser) return null;
 
               return (

@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { MOCK_USERS } from '../data/mock';
 import { 
   ArrowLeft, 
   Send, 
@@ -19,7 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const ChatPage: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
-  const { user, chats, sendMessage, matches } = useApp();
+  const { user, chats, sendMessage, matches, getUserById } = useApp();
   const [inputText, setInputText] = useState('');
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -29,7 +28,7 @@ export const ChatPage: React.FC = () => {
   // Find the match and other user
   const match = matches.find(m => m.id === matchId);
   const otherUserId = match?.userIds.find(id => id !== user?.id);
-  const otherUser = MOCK_USERS.find(u => u.id === otherUserId);
+  const otherUser = getUserById(otherUserId);
   
   // Find the chat for this match
   const chat = chats.find(c => c.matchId === matchId);
@@ -43,9 +42,9 @@ export const ChatPage: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (inputText.trim() && matchId) {
-      sendMessage(matchId, inputText);
+      await sendMessage(matchId, inputText);
       setInputText('');
     }
   };

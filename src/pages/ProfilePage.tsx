@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { MOCK_USERS, MOVIES } from '../data/mock';
+import { MOVIES } from '../data/mock';
 import { ArrowLeft, MoreHorizontal, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const ProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, startChat, matches } = useApp();
+  const { user: currentUser, startChat, matches, getUserById } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'reposts' | 'favorites'>('images');
 
   // Determine which user profile to show
   const isCurrentUser = !userId || userId === currentUser?.id;
-  const profileUser = isCurrentUser ? currentUser : MOCK_USERS.find(u => u.id === userId);
+  const profileUser = isCurrentUser ? currentUser : getUserById(userId);
 
   if (!profileUser) return <div className="p-8 text-center text-white bg-black min-h-screen">Usuário não encontrado</div>;
 
@@ -24,10 +24,10 @@ export const ProfilePage: React.FC = () => {
   
   const compatibility = match?.compatibility.overall || (isCurrentUser ? null : Math.floor(Math.random() * 20) + 75);
 
-  const handleMessage = () => {
+  const handleMessage = async () => {
     if (isCurrentUser) return;
-    const matchId = startChat(profileUser.id);
-    navigate(`/chat/${matchId}`);
+    const matchId = await startChat(profileUser.id);
+    if (matchId) navigate(`/chat/${matchId}`);
   };
 
   const stats = profileUser.stats || { following: 0, followers: 0, creations: 0 };
