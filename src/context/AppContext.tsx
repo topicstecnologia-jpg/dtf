@@ -197,6 +197,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const getAuthRedirectUrl = (path: string) => {
+    const appUrl = import.meta.env.VITE_APP_URL?.replace(/\/$/, '');
+    if (appUrl) return `${appUrl}${path}`;
     if (typeof window === 'undefined') return undefined;
     return `${window.location.origin}${path}`;
   };
