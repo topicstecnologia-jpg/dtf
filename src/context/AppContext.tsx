@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment } from '../types';
+import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment, Story } from '../types';
 import { MOVIES } from '../data/mock';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { createDefaultProfile, mapProfileRowToUser, mapUserToProfileRow, normalizeHandle } from '../lib/profile';
@@ -11,6 +11,7 @@ interface AppContextType {
   matches: Match[];
   chats: Chat[];
   posts: Post[];
+  stories: Story[];
   currentMovieIndex: number;
   isLoading: boolean;
   authError: string;
@@ -26,6 +27,7 @@ interface AppContextType {
   deleteAccount: () => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
+  createStory: (values: { text?: string; imageFile?: File | null }) => Promise<void>;
   getUserById: (userId?: string) => User | undefined;
   completeOnboarding: (answers: Record<string, string>) => Promise<void>;
   swipeMovie: (movieId: string, direction: 'left' | 'right') => Promise<void>;
@@ -47,6 +49,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [matches, setMatches] = useState<Match[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [stories, setStories] = useState<Story[]>([]);
   const [currentMovieIndex, setCurrentMovieIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState('');
@@ -55,6 +58,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!userId) return undefined;
     if (user?.id === userId) return user;
     return profileUsers.find(profile => profile.id === userId);
+  };
+
+  const attachPostToProfile = (post: Post) => {
+    const attach = (profile: User) => {
+      const profilePosts = profile.posts || [];
+      const alreadyAttached = profilePosts.some(item => item.id === post.id);
+      const nextPosts = alreadyAttached ? profilePosts : [post, ...profilePosts];
+
+      return {
+        ...profile,
+        posts: nextPosts,
+        stats: {
+          ...profile.stats,
+          creations: Math.max(profile.stats.creations || 0, nextPosts.length)
+        }
+      };
+    };
+
+    setProfileUsers(prev => prev.map(profile => profile.id === post.userId ? attach(profile) : profile));
+    setUser(prev => prev?.id === post.userId ? attach(prev) : prev);
   };
 
   const persistProfile = async (profile: User) => {
@@ -132,6 +155,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     timestamp: new Date(row.created_at).getTime()
   });
 
+  const mapStoryRow = (row: any): Story => ({
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    mediaUrl: row.media_url || undefined,
+    text: row.text || undefined,
+    timestamp: new Date(row.created_at).getTime()
+  });
+
   const loadPosts = async () => {
     if (!supabase) return;
     const { data } = await supabase
@@ -142,10 +174,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const mappedPosts = (data || []).map(mapPostRow);
 
     setPosts(mappedPosts);
+    setProfileUsers(prev => prev.map(profile => ({
+      ...profile,
+      posts: mappedPosts.filter(post => post.userId === profile.id),
+      stats: {
+        ...profile.stats,
+        creations: Math.max(profile.stats.creations || 0, mappedPosts.filter(post => post.userId === profile.id).length)
+      }
+    })));
+    setUser(prev => {
+      if (!prev) return prev;
+      const userPosts = mappedPosts.filter(post => post.userId === prev.id);
+      return {
+        ...prev,
+        posts: userPosts,
+        stats: {
+          ...prev.stats,
+          creations: Math.max(prev.stats.creations || 0, userPosts.length)
+        }
+      };
+    });
+  };
+
+  const loadStories = async () => {
+    if (!supabase) return;
+    const cutoff = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString();
+    const { data } = await supabase
+      .from('stories')
+      .select('*')
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false });
+
+    setStories((data || []).map(mapStoryRow));
   };
 
   const refreshAppData = async (currentUserId: string) => {
-    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadPosts()]);
+    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadPosts(), loadStories()]);
   };
 
   const syncSession = async () => {
@@ -215,9 +279,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const appendPost = (post: Post) => {
-    setPosts(prevPosts => {
-      if (prevPosts.some(item => item.id === post.id)) return prevPosts;
-      return [post, ...prevPosts];
+    setPosts(prevPosts => (
+      prevPosts.some(item => item.id === post.id) ? prevPosts : [post, ...prevPosts]
+    ));
+    attachPostToProfile(post);
+  };
+
+  const appendCommentToPost = (postId: string, comment: Comment) => {
+    setPosts(prevPosts => prevPosts.map(post => {
+      if (post.id !== postId || post.comments.some(item => item.id === comment.id)) return post;
+      return { ...post, comments: [...post.comments, comment] };
+    }));
+  };
+
+  const appendStory = (story: Story) => {
+    setStories(prevStories => {
+      if (prevStories.some(item => item.id === story.id)) return prevStories;
+      return [story, ...prevStories];
     });
   };
 
@@ -254,7 +332,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const realtimeClient = supabase;
 
     const channel = realtimeClient
-      .channel(`posts:${user.id}`)
+      .channel(`feed:${user.id}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'posts' },
@@ -272,6 +350,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             comments: [],
             timestamp: new Date(row.created_at).getTime()
           });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'comments' },
+        (payload) => {
+          const row = payload.new as any;
+          appendCommentToPost(row.post_id, {
+            id: row.id,
+            userId: row.user_id,
+            userName: row.user_name,
+            userAvatar: row.user_avatar,
+            text: row.text,
+            timestamp: new Date(row.created_at).getTime()
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'stories' },
+        (payload) => {
+          appendStory(mapStoryRow(payload.new as any));
         }
       )
       .subscribe();
@@ -641,6 +741,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data) appendPost(mapPostRow(data));
   };
 
+  const createStory = async (values: { text?: string; imageFile?: File | null }) => {
+    if (!user || !supabase) return;
+
+    const text = values.text?.trim() || '';
+    if (!text && !values.imageFile) {
+      throw new Error('Adicione texto ou imagem para publicar um story.');
+    }
+
+    let mediaUrl = '';
+    if (values.imageFile) {
+      const extension = values.imageFile.name.split('.').pop() || 'jpg';
+      const filePath = `${user.id}/story-${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from('story-media')
+        .upload(filePath, values.imageFile, {
+          contentType: values.imageFile.type || undefined,
+          upsert: false
+        });
+
+      if (uploadError) throw new Error(uploadError.message);
+      const { data } = supabase.storage.from('story-media').getPublicUrl(filePath);
+      mediaUrl = data.publicUrl;
+    }
+
+    const { data, error } = await supabase
+      .from('stories')
+      .insert({
+        user_id: user.id,
+        type: mediaUrl ? 'image' : 'text',
+        media_url: mediaUrl || null,
+        text: text || null
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    if (data) appendStory(mapStoryRow(data));
+  };
+
   const swipeMovie = async (movieId: string, direction: 'left' | 'right') => {
     if (!user) return;
 
@@ -810,6 +949,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     matches,
     chats,
     posts,
+    stories,
     currentMovieIndex,
     isLoading,
     authError,
@@ -826,6 +966,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteAccount,
     toggleFollowUser,
     createPost,
+    createStory,
     completeOnboarding,
     swipeMovie,
     getRecommendedMovies,
@@ -835,7 +976,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addComment,
     toggleSavePost,
     toggleLikePost
-  }), [user, profileUsers, movies, matches, chats, posts, currentMovieIndex, isLoading, authError]);
+  }), [user, profileUsers, movies, matches, chats, posts, stories, currentMovieIndex, isLoading, authError]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

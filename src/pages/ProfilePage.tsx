@@ -44,7 +44,7 @@ export const ProfilePage: React.FC = () => {
   const favoriteMovies = (profileUser.favoriteMovies || []).map(id => MOVIES.find(m => m.id === id)).filter(Boolean);
 
   const filteredPosts = posts.filter(post => {
-    if (activeTab === 'images') return post.type === 'image' || post.type === 'video';
+    if (activeTab === 'images') return post.type === 'image' || post.type === 'video' || post.type === 'text';
     if (activeTab === 'reposts') return post.type === 'repost';
     return false;
   });
@@ -141,11 +141,17 @@ export const ProfilePage: React.FC = () => {
 
       <div className="flex flex-col items-center px-4 pt-2 pb-5">
         <div className="relative mb-3">
-          <img
-            src={profileUser.avatarUrl}
-            alt={profileUser.name}
-            className="w-24 h-24 md:w-20 md:h-20 rounded-full object-cover border-2 border-black"
-          />
+          {profileUser.avatarUrl ? (
+            <img
+              src={profileUser.avatarUrl}
+              alt={profileUser.name}
+              className="w-24 h-24 md:w-20 md:h-20 rounded-full object-cover border-2 border-black"
+            />
+          ) : (
+            <div className="w-24 h-24 md:w-20 md:h-20 rounded-full bg-[#3F1521] border-2 border-black flex items-center justify-center text-3xl md:text-2xl font-bold">
+              {profileUser.name.charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center space-x-1 mb-1">
@@ -183,7 +189,7 @@ export const ProfilePage: React.FC = () => {
           </div>
           <div className="flex flex-col items-center">
             <span className="font-bold text-base">{stats.creations}</span>
-            <span className="text-xs text-gray-400">Likes</span>
+            <span className="text-xs text-gray-400">Posts</span>
           </div>
         </div>
 
@@ -293,11 +299,17 @@ export const ProfilePage: React.FC = () => {
 
               return (
                 <div key={post.id} className="aspect-[1080/1450] bg-zinc-900 relative overflow-hidden">
-                  <img
-                    src={displayImage}
-                    alt="Post"
-                    className="w-full h-full object-cover"
-                  />
+                  {displayImage ? (
+                    <img
+                      src={displayImage}
+                      alt="Post"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-[#222226] p-3 flex items-center justify-center text-center">
+                      <p className="text-xs font-semibold leading-snug line-clamp-6">{post.caption}</p>
+                    </div>
+                  )}
                   <div className="absolute bottom-2 left-2 flex items-center space-x-1 text-white text-xs drop-shadow-md">
                     <Play size={12} fill="currentColor" />
                     <span>{Math.floor(Math.random() * 50) + 1}K</span>
@@ -336,11 +348,17 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             <div className="flex flex-col items-center mb-6">
-              <img
-                src={avatarPreview}
-                alt="Avatar"
-                className="w-24 h-24 rounded-full object-cover border border-white/10 mb-3"
-              />
+              {avatarPreview ? (
+                <img
+                  src={avatarPreview}
+                  alt="Avatar"
+                  className="w-24 h-24 rounded-full object-cover border border-white/10 mb-3"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-[#3F1521] border border-white/10 mb-3 flex items-center justify-center text-3xl font-bold">
+                  {profileUser.name.charAt(0).toUpperCase()}
+                </div>
+              )}
               <label className="flex items-center gap-2 rounded-full bg-zinc-800 px-4 py-2 text-sm font-medium cursor-pointer hover:bg-zinc-700">
                 <ImageIcon size={16} />
                 Alterar foto

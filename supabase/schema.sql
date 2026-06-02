@@ -52,6 +52,15 @@ create table if not exists public.posts (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.stories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  type text not null default 'text' check (type in ('image', 'text')),
+  media_url text,
+  text text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.comments (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.posts(id) on delete cascade,
@@ -98,6 +107,10 @@ on conflict (id) do update set public = true;
 
 insert into storage.buckets (id, name, public)
 values ('post-media', 'post-media', true)
+on conflict (id) do update set public = true;
+
+insert into storage.buckets (id, name, public)
+values ('story-media', 'story-media', true)
 on conflict (id) do update set public = true;
 
 drop policy if exists "Avatar files are public" on storage.objects;
@@ -202,6 +215,42 @@ create policy "Users can update their post media"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+drop policy if exists "Story media files are public" on storage.objects;
+create policy "Story media files are public"
+  on storage.objects for select
+  using (bucket_id = 'story-media');
+
+drop policy if exists "Users can upload their story media" on storage.objects;
+create policy "Users can upload their story media"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'story-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users can update their story media" on storage.objects;
+create policy "Users can update their story media"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'story-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'story-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users can remove their story media" on storage.objects;
+create policy "Users can remove their story media"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'story-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
@@ -226,6 +275,30 @@ begin
     )
   then
     alter publication supabase_realtime add table public.posts;
+  end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'comments'
+    )
+  then
+    alter publication supabase_realtime add table public.comments;
+  end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'stories'
+    )
+  then
+    alter publication supabase_realtime add table public.stories;
   end if;
 end;
 $$;
@@ -282,6 +355,7 @@ alter table public.profiles enable row level security;
 alter table public.matches enable row level security;
 alter table public.messages enable row level security;
 alter table public.posts enable row level security;
+alter table public.stories enable row level security;
 alter table public.comments enable row level security;
 alter table public.post_likes enable row level security;
 
@@ -358,6 +432,24 @@ create policy "Users can create their own posts"
   on public.posts for insert
   to authenticated
   with check (auth.uid() = user_id);
+
+drop policy if exists "Stories are visible to authenticated users" on public.stories;
+create policy "Stories are visible to authenticated users"
+  on public.stories for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Users can create their own stories" on public.stories;
+create policy "Users can create their own stories"
+  on public.stories for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can remove their own stories" on public.stories;
+create policy "Users can remove their own stories"
+  on public.stories for delete
+  to authenticated
+  using (auth.uid() = user_id);
 
 drop policy if exists "Comments are visible to authenticated users" on public.comments;
 create policy "Comments are visible to authenticated users"

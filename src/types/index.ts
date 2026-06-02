@@ -32,6 +32,15 @@ export interface Post {
   timestamp: number;
 }
 
+export interface Story {
+  id: string;
+  userId: string;
+  type: 'image' | 'text';
+  mediaUrl?: string;
+  text?: string;
+  timestamp: number;
+}
+
 export interface User {
   id: string;
   name: string;

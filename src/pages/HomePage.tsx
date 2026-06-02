@@ -1,24 +1,31 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark } from 'lucide-react';
+import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type } from 'lucide-react';
 import { MOVIES } from '../data/mock';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Post } from '../types';
+import { Post, Story } from '../types';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, posts, addComment, toggleSavePost, toggleLikePost, profileUsers, getUserById } = useApp();
+  const { user, posts, stories, addComment, toggleSavePost, toggleLikePost, profileUsers, getUserById } = useApp();
   const [activeTab, setActiveTab] = useState('Community');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [commentText, setCommentText] = useState('');
+  const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
+
+  const latestStoriesByUser = stories.reduce<Story[]>((latestStories, story) => {
+    if (!latestStories.some(item => item.userId === story.userId)) latestStories.push(story);
+    return latestStories;
+  }, []);
 
   const tabs = ['Feed', 'Community'];
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedPost && commentText.trim()) {
-      addComment(selectedPost.id, commentText);
+    if (liveSelectedPost && commentText.trim()) {
+      addComment(liveSelectedPost.id, commentText);
       setCommentText('');
     }
   };
@@ -28,38 +35,53 @@ export const HomePage: React.FC = () => {
       {/* Stories Section */}
       <div className="pt-5 md:pt-16 px-4 mb-5 md:mb-4">
         <div className="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide">
-          {/* Your Story */}
           <div className="flex flex-col items-center space-y-2 min-w-[72px]">
             <div className="relative w-[72px] h-[72px]">
               <div className="w-full h-full rounded-[24px] border-2 border-dashed border-gray-600 p-1 flex items-center justify-center">
-                <img 
-                  src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80"} 
-                  alt="Your story" 
-                  className="w-full h-full rounded-[20px] object-cover opacity-50"
-                />
+                {user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt="Seu story"
+                    className="w-full h-full rounded-[20px] object-cover opacity-50"
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-[20px] bg-[#222226] flex items-center justify-center text-zinc-500">
+                    <Plus size={22} />
+                  </div>
+                )}
               </div>
               <div className="absolute bottom-0 right-0 bg-white text-black rounded-full p-1 translate-x-1 translate-y-1">
                 <Plus size={14} strokeWidth={3} />
               </div>
             </div>
-            <span className="text-xs text-gray-400 font-medium">Your Story</span>
+            <span className="text-xs text-gray-400 font-medium">Seu story</span>
           </div>
           
-          {/* Other Stories */}
-          {profileUsers.filter((profile) => profile.id !== user?.id).map((u, index) => (
-            <div key={u.id} className="flex flex-col items-center space-y-2 min-w-[72px] cursor-pointer" onClick={() => navigate(`/profile/${u.handle}`)}>
-              <div className={`w-[72px] h-[72px] rounded-[24px] p-[2px] ${index % 2 === 0 ? 'bg-gradient-to-tr from-yellow-400 to-orange-500' : 'bg-gradient-to-tr from-green-400 to-blue-500'}`}>
+          {latestStoriesByUser.map((story, index) => {
+            const storyUser = getUserById(story.userId);
+            if (!storyUser) return null;
+
+            return (
+              <div key={story.id} className="flex flex-col items-center space-y-2 min-w-[72px] cursor-pointer" onClick={() => setSelectedStory(story)}>
+                <div className={`w-[72px] h-[72px] rounded-[24px] p-[2px] ${index % 2 === 0 ? 'bg-gradient-to-tr from-yellow-400 to-orange-500' : 'bg-gradient-to-tr from-green-400 to-blue-500'}`}>
                 <div className="w-full h-full rounded-[22px] bg-[#17171B] p-[2px]">
-                  <img 
-                    src={u.avatarUrl} 
-                    alt={u.name} 
-                    className="w-full h-full rounded-[20px] object-cover"
-                  />
+                  {story.type === 'image' && story.mediaUrl ? (
+                    <img
+                      src={story.mediaUrl}
+                      alt={storyUser.name}
+                      className="w-full h-full rounded-[20px] object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full rounded-[20px] bg-[#3F1521] p-2 flex items-center justify-center text-[10px] font-bold text-center line-clamp-3">
+                      {story.text || storyUser.name}
+                    </div>
+                  )}
                 </div>
               </div>
-              <span className="text-xs text-gray-300 font-medium">{u.name.split(' ')[0]}</span>
+              <span className="text-xs text-gray-300 font-medium">{storyUser.name.split(' ')[0]}</span>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -184,11 +206,17 @@ export const HomePage: React.FC = () => {
                       className="flex items-center space-x-3 cursor-pointer"
                       onClick={() => navigate(`/profile/${postUser.handle}`)}
                     >
-                      <img 
-                        src={postUser.avatarUrl} 
-                        alt={postUser.name} 
-                        className="w-10 h-10 rounded-full object-cover border border-white/10"
-                      />
+                      {postUser.avatarUrl ? (
+                        <img
+                          src={postUser.avatarUrl}
+                          alt={postUser.name}
+                          className="w-10 h-10 rounded-full object-cover border border-white/10"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#3F1521] border border-white/10 flex items-center justify-center text-sm font-bold">
+                          {postUser.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div>
                         <p className="font-bold text-sm text-white">{postUser.name}</p>
                         <p className="text-xs text-gray-400">{postUser.handle}</p>
@@ -265,9 +293,44 @@ export const HomePage: React.FC = () => {
         )}
       </div>
 
+      <AnimatePresence>
+        {selectedStory && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedStory(null)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="relative w-full max-w-sm aspect-[9/16] rounded-[30px] overflow-hidden bg-[#222226] border border-white/10"
+            >
+              <button
+                onClick={() => setSelectedStory(null)}
+                className="absolute right-4 top-4 z-10 p-2 rounded-full bg-black/35 text-white"
+              >
+                <X size={18} />
+              </button>
+              {selectedStory.type === 'image' && selectedStory.mediaUrl ? (
+                <img src={selectedStory.mediaUrl} alt="Story" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-[#3F1521] p-8 flex flex-col items-center justify-center text-center">
+                  <Type size={30} className="mb-4 text-white/70" />
+                  <p className="text-2xl font-bold leading-tight">{selectedStory.text}</p>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Comment Modal */}
       <AnimatePresence>
-        {selectedPost && (
+        {liveSelectedPost && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-4">
             <motion.div 
               initial={{ opacity: 0 }}
@@ -296,19 +359,25 @@ export const HomePage: React.FC = () => {
 
               {/* Comments List */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-                {selectedPost.comments.length === 0 ? (
+                {liveSelectedPost.comments.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <MessageCircle size={48} className="text-gray-700 mb-4" />
                     <p className="text-gray-500">Nenhum comentário ainda.<br/>Seja o primeiro a comentar!</p>
                   </div>
                 ) : (
-                  selectedPost.comments.map((comment) => (
+                  liveSelectedPost.comments.map((comment) => (
                     <div key={comment.id} className="flex space-x-4">
-                      <img 
-                        src={comment.userAvatar} 
-                        alt={comment.userName} 
-                        className="w-10 h-10 rounded-full object-cover border border-white/10"
-                      />
+                      {comment.userAvatar ? (
+                        <img
+                          src={comment.userAvatar}
+                          alt={comment.userName}
+                          className="w-10 h-10 rounded-full object-cover border border-white/10"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#3F1521] border border-white/10 flex items-center justify-center text-sm font-bold">
+                          {comment.userName.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-bold text-sm">{comment.userName}</span>
@@ -326,11 +395,17 @@ export const HomePage: React.FC = () => {
               {/* Comment Input */}
               <div className="p-6 bg-[#222226] border-t border-white/5">
                 <form onSubmit={handleAddComment} className="flex items-center space-x-3">
-                  <img 
-                    src={user?.avatarUrl} 
-                    alt={user?.name} 
-                    className="w-10 h-10 rounded-full object-cover border border-white/10"
-                  />
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      className="w-10 h-10 rounded-full object-cover border border-white/10"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-[#3F1521] border border-white/10 flex items-center justify-center text-sm font-bold">
+                      {user?.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <div className="flex-1 relative">
                     <input 
                       type="text" 
