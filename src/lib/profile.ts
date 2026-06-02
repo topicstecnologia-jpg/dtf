@@ -54,7 +54,7 @@ export const mapProfileRowToUser = (row: any): User => ({
   name: row.name || 'Usuario',
   handle: row.handle || '@usuario',
   usernameConfigured: row.username_configured ?? Boolean(row.handle && row.handle !== '@usuario'),
-  onboardingCompleted: row.onboarding_completed ?? Boolean(row.emotional_profile),
+  onboardingCompleted: Boolean(row.onboarding_completed || row.emotional_profile),
   avatarUrl: row.avatar_url || defaultAvatar,
   coverUrl: row.cover_url || defaultCover,
   bio: row.bio || '',
