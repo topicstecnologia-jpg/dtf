@@ -264,7 +264,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .update({ handle: normalizedHandle, username_configured: true })
       .eq('id', user.id);
 
-    if (error) throw error;
+    if (error) {
+      if (error.code !== 'PGRST204') throw new Error(error.message);
+
+      const { error: fallbackError } = await supabase
+        .from('profiles')
+        .update({ handle: normalizedHandle })
+        .eq('id', user.id);
+
+      if (fallbackError) throw new Error(fallbackError.message);
+    }
 
     setUser(updatedUser);
     setProfileUsers(prev => prev.map(profile => profile.id === user.id ? updatedUser : profile));

@@ -34,7 +34,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     try {
       await updateHandle(handleInput);
     } catch (error) {
-      setHandleError(error instanceof Error ? error.message : 'Nao foi possivel salvar seu @.');
+      const message = error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error && 'message' in error
+          ? String(error.message)
+          : 'Nao foi possivel salvar seu @.';
+      setHandleError(message);
     } finally {
       setIsSavingHandle(false);
     }

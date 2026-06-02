@@ -51,7 +51,7 @@ export const mapProfileRowToUser = (row: any): User => ({
   id: row.id,
   name: row.name || 'Usuario',
   handle: row.handle || '@usuario',
-  usernameConfigured: row.username_configured || false,
+  usernameConfigured: row.username_configured ?? Boolean(row.handle && row.handle !== '@usuario'),
   avatarUrl: row.avatar_url || defaultAvatar,
   coverUrl: row.cover_url || defaultCover,
   bio: row.bio || '',
