@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type } from 'lucide-react';
+import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type, Search } from 'lucide-react';
 import { MOVIES } from '../data/mock';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,6 +13,7 @@ export const HomePage: React.FC = () => {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [commentText, setCommentText] = useState('');
+  const [profileSearch, setProfileSearch] = useState('');
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
 
   const latestStoriesByUser = stories.reduce<Story[]>((latestStories, story) => {
@@ -21,6 +22,15 @@ export const HomePage: React.FC = () => {
   }, []);
 
   const tabs = ['Feed', 'Community'];
+  const searchTerm = profileSearch.trim().toLowerCase();
+  const searchedProfiles = searchTerm
+    ? profileUsers
+      .filter(profile => (
+        profile.name.toLowerCase().includes(searchTerm) ||
+        profile.handle.toLowerCase().includes(searchTerm.replace(/^@/, ''))
+      ))
+      .slice(0, 6)
+    : [];
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +42,53 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-[#17171B] text-white pb-24 md:pb-20">
-      {/* Stories Section */}
       <div className="pt-5 md:pt-16 px-4 mb-5 md:mb-4">
+        <div className="relative mb-5">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input
+            value={profileSearch}
+            onChange={(event) => setProfileSearch(event.target.value)}
+            className="w-full h-12 rounded-full bg-[#222226] border border-white/10 pl-11 pr-4 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-white/25"
+            placeholder="Pesquisar perfis"
+          />
+
+          {searchTerm && (
+            <div className="absolute left-0 right-0 top-14 z-40 rounded-3xl border border-white/10 bg-[#222226] p-2 shadow-2xl">
+              {searchedProfiles.length > 0 ? (
+                searchedProfiles.map(profile => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => {
+                      setProfileSearch('');
+                      navigate(`/profile/${profile.handle}`);
+                    }}
+                    className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-white/5 transition-colors"
+                  >
+                    {profile.avatarUrl ? (
+                      <img
+                        src={profile.avatarUrl}
+                        alt={profile.name}
+                        className="w-10 h-10 rounded-full object-cover border border-white/10"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#3F1521] border border-white/10 flex items-center justify-center text-sm font-bold">
+                        {profile.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{profile.name}</p>
+                      <p className="text-xs text-zinc-400 truncate">{profile.handle}</p>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="px-4 py-3 text-sm text-zinc-500">Nenhum perfil encontrado.</p>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide">
           <div className="flex flex-col items-center space-y-2 min-w-[72px]">
             <div className="relative w-[72px] h-[72px]">
