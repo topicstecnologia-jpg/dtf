@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type, Search, Camera, Image as ImageIcon, Trash2, Bell, Repeat2 } from 'lucide-react';
 import { MOVIES } from '../data/mock';
@@ -8,7 +8,7 @@ import { Post, Story } from '../types';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, posts, stories, matches, sendMessage, addComment, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory } = useApp();
+  const { user, posts, stories, matches, sendMessage, addComment, addStoryComment, toggleLikeStory, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory } = useApp();
   const [activeTab, setActiveTab] = useState('Community');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
@@ -19,12 +19,14 @@ export const HomePage: React.FC = () => {
   const [sceneError, setSceneError] = useState('');
   const [isPublishingScene, setIsPublishingScene] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [storyCommentText, setStoryCommentText] = useState('');
   const [profileSearch, setProfileSearch] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState<'all' | 'likes' | 'comments' | 'follows' | 'profiles'>('all');
   const [postToSend, setPostToSend] = useState<Post | null>(null);
   const [postActionMessage, setPostActionMessage] = useState('');
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
+  const liveSelectedStory = selectedStory ? stories.find(story => story.id === selectedStory.id) || selectedStory : null;
 
   const latestStoriesByUser = stories.reduce<Story[]>((latestStories, story) => {
     if (!latestStories.some(item => item.userId === story.userId)) latestStories.push(story);
@@ -32,6 +34,7 @@ export const HomePage: React.FC = () => {
   }, []);
   const currentUserScene = latestStoriesByUser.find(story => story.userId === user?.id);
   const otherUserScenes = latestStoriesByUser.filter(story => story.userId !== user?.id);
+  const selectedStoryIndex = liveSelectedStory ? latestStoriesByUser.findIndex(story => story.id === liveSelectedStory.id) : -1;
 
   const tabs = ['Feed', 'Community'];
   const searchTerm = profileSearch.trim().toLowerCase();
@@ -92,6 +95,40 @@ export const HomePage: React.FC = () => {
       setCommentText('');
     }
   };
+
+  const openStory = (story: Story) => {
+    setSelectedStory(story);
+    setStoryCommentText('');
+    setSceneError('');
+  };
+
+  const goToNextStory = () => {
+    if (selectedStoryIndex < 0) return setSelectedStory(null);
+    const nextStory = latestStoriesByUser[selectedStoryIndex + 1];
+    if (nextStory) {
+      openStory(nextStory);
+    } else {
+      setSelectedStory(null);
+    }
+  };
+
+  const goToPreviousStory = () => {
+    if (selectedStoryIndex <= 0) return;
+    openStory(latestStoriesByUser[selectedStoryIndex - 1]);
+  };
+
+  const handleAddStoryComment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!liveSelectedStory || !storyCommentText.trim()) return;
+    await addStoryComment(liveSelectedStory.id, storyCommentText);
+    setStoryCommentText('');
+  };
+
+  useEffect(() => {
+    if (!liveSelectedStory) return;
+    const timer = window.setTimeout(goToNextStory, 15000);
+    return () => window.clearTimeout(timer);
+  }, [liveSelectedStory?.id, selectedStoryIndex, latestStoriesByUser.length]);
 
   const handleSceneImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -342,7 +379,7 @@ export const HomePage: React.FC = () => {
               type="button"
               onClick={() => {
                 if (currentUserScene) {
-                  setSelectedStory(currentUserScene);
+                  openStory(currentUserScene);
                 } else {
                   resetSceneComposer();
                   setIsComposingScene(true);
@@ -400,7 +437,7 @@ export const HomePage: React.FC = () => {
             if (!storyUser) return null;
 
             return (
-              <div key={story.id} className="flex flex-col items-center space-y-2 min-w-[78px] cursor-pointer" onClick={() => setSelectedStory(story)}>
+              <div key={story.id} className="flex flex-col items-center space-y-2 min-w-[78px] cursor-pointer" onClick={() => openStory(story)}>
                 <div className={`w-[78px] h-[78px] rounded-full p-[3px] ${index % 2 === 0 ? 'bg-gradient-to-tr from-[#F7A3C5] via-[#9FC4FF] to-[#8D4B5C]' : 'bg-gradient-to-tr from-[#B4F8C8] via-[#A0E7E5] to-[#A18CD1]'}`}>
                 <div className="w-full h-full rounded-full bg-[#17171B] p-[3px]">
                   {story.type === 'image' && story.mediaUrl ? (
@@ -516,23 +553,26 @@ export const HomePage: React.FC = () => {
           <div className="space-y-5 md:max-w-[390px] md:mx-auto">
             {posts.map((post) => {
               const postUser = getUserById(post.userId) || user;
-              const postMovie = MOVIES.find(m => m.id === post.movieId) || {
+              const originalPost = post.repostOfId ? posts.find(item => item.id === post.repostOfId) : null;
+              const displayPost = originalPost || post;
+              const contentUser = originalPost ? getUserById(originalPost.userId) || postUser : postUser;
+              const postMovie = MOVIES.find(m => m.id === displayPost.movieId) || {
                 id: post.id,
-                title: post.thumbnailUrl ? 'Publicacao' : 'Texto',
+                title: displayPost.thumbnailUrl ? 'Publicacao' : 'Texto',
                 year: new Date(post.timestamp).getFullYear(),
-                genres: post.type === 'text' ? ['Texto'] : ['Feed'],
-                description: post.caption,
-                posterUrl: post.thumbnailUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1080' height='1450' viewBox='0 0 1080 1450'%3E%3Crect width='1080' height='1450' fill='%2317171B'/%3E%3C/svg%3E",
+                genres: displayPost.type === 'text' ? ['Texto'] : ['Feed'],
+                description: displayPost.caption,
+                posterUrl: displayPost.thumbnailUrl || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1080' height='1450' viewBox='0 0 1080 1450'%3E%3Crect width='1080' height='1450' fill='%2317171B'/%3E%3C/svg%3E",
                 platforms: [],
                 rating: 0,
                 moods: []
               };
               const isSaved = user?.savedPosts.includes(post.id);
               
-              if (!postUser) return null;
+              if (!postUser || !contentUser) return null;
               const hoursAgo = Math.max(0, Math.floor((Date.now() - post.timestamp) / (1000 * 60 * 60)));
 
-              if (post.type === 'text' && !post.thumbnailUrl) {
+              if (displayPost.type === 'text' && !displayPost.thumbnailUrl) {
                 return (
                   <motion.article
                     key={post.id}
@@ -541,20 +581,20 @@ export const HomePage: React.FC = () => {
                     className="bg-[#111113] border border-white/10 px-4 py-4 rounded-2xl"
                   >
                     <div className="flex items-start gap-3">
-                      <button type="button" onClick={() => navigate(`/profile/${postUser.handle}`)} className="relative shrink-0">
-                        {postUser.avatarUrl ? (
-                          <img src={postUser.avatarUrl} alt={postUser.name} className="w-11 h-11 rounded-full object-cover border border-white/10" />
+                      <button type="button" onClick={() => navigate(`/profile/${contentUser.handle}`)} className="relative shrink-0">
+                        {contentUser.avatarUrl ? (
+                          <img src={contentUser.avatarUrl} alt={contentUser.name} className="w-11 h-11 rounded-full object-cover border border-white/10" />
                         ) : (
                           <div className="w-11 h-11 rounded-full bg-[#3F1521] border border-white/10 flex items-center justify-center text-sm font-bold">
-                            {postUser.name.charAt(0).toUpperCase()}
+                            {contentUser.name.charAt(0).toUpperCase()}
                           </div>
                         )}
                       </button>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3 mb-1">
-                          <button type="button" onClick={() => navigate(`/profile/${postUser.handle}`)} className="min-w-0 text-left">
-                            <span className="font-bold text-white text-sm">{postUser.handle}</span>
+                          <button type="button" onClick={() => navigate(`/profile/${contentUser.handle}`)} className="min-w-0 text-left">
+                            <span className="font-bold text-white text-sm">{contentUser.handle}</span>
                             <span className="text-zinc-500 text-sm ml-2">{hoursAgo} h</span>
                           </button>
                           <button className="text-zinc-500 hover:text-white">
@@ -563,8 +603,22 @@ export const HomePage: React.FC = () => {
                         </div>
 
                         <p className="text-[15px] leading-relaxed text-zinc-100 whitespace-pre-line">
-                          {post.caption}
+                          {displayPost.caption}
                         </p>
+
+                        {post.type === 'repost' && (
+                          <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
+                            <Repeat2 size={14} />
+                            <span>republicado por:</span>
+                            {postUser.avatarUrl ? (
+                              <img src={postUser.avatarUrl} alt={postUser.name} className="h-5 w-5 rounded-full object-cover" />
+                            ) : (
+                              <span className="h-5 w-5 rounded-full bg-[#3F1521] flex items-center justify-center text-[10px] text-white">
+                                {postUser.name.charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         <div className="mt-4 flex items-center gap-7 text-zinc-400">
                           <button
@@ -605,22 +659,22 @@ export const HomePage: React.FC = () => {
                   <div className="flex items-center justify-between p-3.5">
                     <div 
                       className="flex items-center space-x-3 cursor-pointer"
-                      onClick={() => navigate(`/profile/${postUser.handle}`)}
+                      onClick={() => navigate(`/profile/${contentUser.handle}`)}
                     >
-                      {postUser.avatarUrl ? (
+                      {contentUser.avatarUrl ? (
                         <img
-                          src={postUser.avatarUrl}
-                          alt={postUser.name}
+                          src={contentUser.avatarUrl}
+                          alt={contentUser.name}
                           className="w-10 h-10 rounded-full object-cover border border-white/10"
                         />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-[#3F1521] border border-white/10 flex items-center justify-center text-sm font-bold">
-                          {postUser.name.charAt(0).toUpperCase()}
+                          {contentUser.name.charAt(0).toUpperCase()}
                         </div>
                       )}
                       <div>
-                        <p className="font-bold text-sm text-white">{postUser.name}</p>
-                        <p className="text-xs text-gray-400">{postUser.handle}</p>
+                        <p className="font-bold text-sm text-white">{contentUser.name}</p>
+                        <p className="text-xs text-gray-400">{contentUser.handle}</p>
                       </div>
                     </div>
                     <button className="text-gray-400 hover:text-white">
@@ -637,6 +691,18 @@ export const HomePage: React.FC = () => {
                     />
                     <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-5 pt-16">
                       <h3 className="text-white font-bold text-lg">{postMovie.title}</h3>
+                      {post.type === 'repost' && (
+                        <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-black/35 px-3 py-2 text-xs font-medium text-white backdrop-blur-md">
+                          <span>republicado por:</span>
+                          {postUser.avatarUrl ? (
+                            <img src={postUser.avatarUrl} alt={postUser.name} className="h-6 w-6 rounded-full object-cover border border-white/20" />
+                          ) : (
+                            <span className="h-6 w-6 rounded-full bg-[#3F1521] flex items-center justify-center text-[10px]">
+                              {postUser.name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <p className="text-white/70 text-xs mt-1">{postMovie.year} • {postMovie.genres.join(', ')}</p>
                     </div>
                   </div>
@@ -698,8 +764,8 @@ export const HomePage: React.FC = () => {
 
                     <p className="font-bold text-sm mb-2">{post.likes} curtidas</p>
                     <p className="text-sm text-gray-300 leading-relaxed">
-                      <span className="font-bold text-white mr-2">{postUser.handle}</span>
-                      {post.caption}
+                      <span className="font-bold text-white mr-2">{contentUser.handle}</span>
+                      {displayPost.caption}
                     </p>
                     <p className="text-xs text-gray-500 mt-3 uppercase tracking-wide font-medium">
                       {Math.floor((Date.now() - post.timestamp) / (1000 * 60 * 60))}h atrás
@@ -839,43 +905,146 @@ export const HomePage: React.FC = () => {
       </AnimatePresence>
 
       <AnimatePresence>
-        {selectedStory && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        {liveSelectedStory && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedStory(null)}
-              className="absolute inset-0 bg-black/85 backdrop-blur-sm"
+              className="absolute inset-0 bg-black"
             />
             <motion.div
+              key={liveSelectedStory.id}
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="relative w-full max-w-sm aspect-[9/16] rounded-[30px] overflow-hidden bg-[#222226] border border-white/10"
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.25}
+              onDragEnd={(_, info) => {
+                if (info.offset.x < -70) goToNextStory();
+                if (info.offset.x > 70) goToPreviousStory();
+              }}
+              className="relative w-full h-[100dvh] max-w-md overflow-hidden bg-[#222226] md:h-[92dvh] md:rounded-[30px] md:border md:border-white/10"
             >
-              <button
-                onClick={() => setSelectedStory(null)}
-                className="absolute right-4 top-4 z-10 p-2 rounded-full bg-black/35 text-white"
-              >
-                <X size={18} />
-              </button>
-              {selectedStory.userId === user?.id && (
-                <button
-                  onClick={handleDeleteScene}
-                  className="absolute left-4 top-4 z-10 p-2 rounded-full bg-black/35 text-white hover:bg-red-500/80 transition-colors"
-                >
-                  <Trash2 size={18} />
-                </button>
-              )}
-              {selectedStory.type === 'image' && selectedStory.mediaUrl ? (
-                <img src={selectedStory.mediaUrl} alt="Cena" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-[#3F1521] p-8 flex flex-col items-center justify-center text-center">
-                  <Type size={30} className="mb-4 text-white/70" />
-                  <p className="text-2xl font-bold leading-tight">{selectedStory.text}</p>
-                </div>
-              )}
+              {(() => {
+                const storyUser = getUserById(liveSelectedStory.userId);
+                const isLiked = liveSelectedStory.likedBy.includes(user?.id || '');
+                const minutesAgo = Math.max(0, Math.floor((Date.now() - liveSelectedStory.timestamp) / 60000));
+
+                return (
+                  <>
+                    <div className="absolute inset-x-0 top-0 z-20 p-4 pt-[max(1rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/65 to-transparent">
+                      <div className="mb-3 flex gap-1">
+                        {latestStoriesByUser.map((story, index) => (
+                          <div key={story.id} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/30">
+                            <div className={`h-full rounded-full bg-white ${index < selectedStoryIndex ? 'w-full' : index === selectedStoryIndex ? 'animate-[story-progress_15s_linear_forwards]' : 'w-0'}`} />
+                          </div>
+                        ))}
+                      </div>
+                      <style>{`
+                        @keyframes story-progress {
+                          from { width: 0%; }
+                          to { width: 100%; }
+                        }
+                      `}</style>
+                      <div className="flex items-center justify-between gap-3">
+                        <button
+                          type="button"
+                          onClick={() => storyUser && navigate(`/profile/${storyUser.handle}`)}
+                          className="flex min-w-0 items-center gap-3 text-left"
+                        >
+                          {storyUser?.avatarUrl ? (
+                            <img src={storyUser.avatarUrl} alt={storyUser.name} className="h-10 w-10 rounded-full object-cover border border-white/20" />
+                          ) : (
+                            <div className="h-10 w-10 rounded-full bg-[#3F1521] border border-white/20 flex items-center justify-center text-sm font-bold">
+                              {storyUser?.name.charAt(0).toUpperCase() || '@'}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-bold text-white">{storyUser?.handle || 'Cena'}</p>
+                            <p className="text-xs text-white/70">{minutesAgo < 60 ? `${minutesAgo} min` : `${Math.floor(minutesAgo / 60)} h`}</p>
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-2">
+                          {liveSelectedStory.userId === user?.id && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteScene}
+                              className="rounded-full bg-black/35 p-2 text-white hover:bg-red-500/80 transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStory(null)}
+                            className="rounded-full bg-black/35 p-2 text-white"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button type="button" onClick={goToPreviousStory} className="absolute left-0 top-24 bottom-24 z-10 w-1/3" aria-label="Cena anterior" />
+                    <button type="button" onClick={goToNextStory} className="absolute right-0 top-24 bottom-24 z-10 w-1/3" aria-label="Proxima cena" />
+
+                    {liveSelectedStory.type === 'image' && liveSelectedStory.mediaUrl ? (
+                      <img src={liveSelectedStory.mediaUrl} alt="Cena" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full bg-[#3F1521] p-8 flex flex-col items-center justify-center text-center">
+                        <Type size={30} className="mb-4 text-white/70" />
+                        <p className="text-3xl font-bold leading-tight">{liveSelectedStory.text}</p>
+                      </div>
+                    )}
+
+                    {liveSelectedStory.text && liveSelectedStory.type === 'image' && (
+                      <div className="absolute left-5 right-5 bottom-32 z-20 text-center">
+                        <p className="inline rounded-2xl bg-black/25 px-3 py-2 text-lg font-semibold text-white backdrop-blur-sm">
+                          {liveSelectedStory.text}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="absolute inset-x-0 bottom-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/70 to-transparent">
+                      {liveSelectedStory.comments.length > 0 && (
+                        <div className="mb-3 max-h-28 space-y-2 overflow-y-auto scrollbar-hide">
+                          {liveSelectedStory.comments.slice(-3).map(comment => (
+                            <div key={comment.id} className="rounded-2xl bg-black/30 px-3 py-2 backdrop-blur-sm">
+                              <p className="text-xs font-bold text-white">{comment.userName}</p>
+                              <p className="text-xs text-white/80">{comment.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <form onSubmit={handleAddStoryComment} className="flex items-center gap-3">
+                        <input
+                          value={storyCommentText}
+                          onChange={(event) => setStoryCommentText(event.target.value)}
+                          className="h-12 min-w-0 flex-1 rounded-full border border-white/80 bg-black/25 px-5 text-sm text-white outline-none placeholder:text-white/75 backdrop-blur-sm"
+                          placeholder={`Responder a ${storyUser?.handle || 'esta cena'}...`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => toggleLikeStory(liveSelectedStory.id)}
+                          className={`rounded-full p-2 ${isLiked ? 'text-red-500' : 'text-white'}`}
+                        >
+                          <Heart size={28} fill={isLiked ? 'currentColor' : 'none'} />
+                        </button>
+                        <button type="submit" disabled={!storyCommentText.trim()} className="rounded-full p-2 text-white disabled:opacity-40">
+                          <Send size={26} />
+                        </button>
+                      </form>
+                      <div className="mt-2 flex items-center gap-4 pl-2 text-xs text-white/75">
+                        <span>{liveSelectedStory.likes} curtidas</span>
+                        <span>{liveSelectedStory.comments.length} comentarios</span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </motion.div>
           </div>
         )}

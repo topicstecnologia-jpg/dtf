@@ -45,6 +45,7 @@ create table if not exists public.messages (
 create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
+  repost_of uuid references public.posts(id) on delete set null,
   movie_id text,
   type text not null default 'image' check (type in ('image', 'video', 'repost', 'text')),
   thumbnail_url text,
@@ -86,6 +87,23 @@ create table if not exists public.post_views (
   primary key (post_id, user_id)
 );
 
+create table if not exists public.story_likes (
+  story_id uuid not null references public.stories(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (story_id, user_id)
+);
+
+create table if not exists public.story_comments (
+  id uuid primary key default gen_random_uuid(),
+  story_id uuid not null references public.stories(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  user_name text not null,
+  user_avatar text,
+  text text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles
   add column if not exists username_configured boolean not null default false;
 
@@ -103,6 +121,9 @@ alter table public.posts
 
 alter table public.posts
   add constraint posts_type_check check (type in ('image', 'video', 'repost', 'text'));
+
+alter table public.posts
+  add column if not exists repost_of uuid references public.posts(id) on delete set null;
 
 create unique index if not exists profiles_handle_unique_idx
   on public.profiles (lower(handle))
@@ -311,6 +332,30 @@ begin
   then
     alter publication supabase_realtime add table public.stories;
   end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'story_likes'
+    )
+  then
+    alter publication supabase_realtime add table public.story_likes;
+  end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'story_comments'
+    )
+  then
+    alter publication supabase_realtime add table public.story_comments;
+  end if;
 end;
 $$;
 
@@ -325,6 +370,24 @@ end;
 $$;
 
 grant execute on function public.delete_current_user() to authenticated;
+
+create or replace function public.delete_own_post(post_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  delete from public.posts
+  where id = post_id
+  and user_id = auth.uid();
+
+  if not found then
+    raise exception 'Postagem nao encontrada ou sem permissao para excluir.';
+  end if;
+end;
+$$;
+
+grant execute on function public.delete_own_post(uuid) to authenticated;
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -370,6 +433,8 @@ alter table public.stories enable row level security;
 alter table public.comments enable row level security;
 alter table public.post_likes enable row level security;
 alter table public.post_views enable row level security;
+alter table public.story_likes enable row level security;
+alter table public.story_comments enable row level security;
 
 drop policy if exists "Profiles are visible to authenticated users" on public.profiles;
 create policy "Profiles are visible to authenticated users"
@@ -475,6 +540,36 @@ create policy "Users can remove their own stories"
   on public.stories for delete
   to authenticated
   using (auth.uid() = user_id);
+
+drop policy if exists "Story likes are visible to authenticated users" on public.story_likes;
+create policy "Story likes are visible to authenticated users"
+  on public.story_likes for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Users can like stories as themselves" on public.story_likes;
+create policy "Users can like stories as themselves"
+  on public.story_likes for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can remove their own story likes" on public.story_likes;
+create policy "Users can remove their own story likes"
+  on public.story_likes for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "Story comments are visible to authenticated users" on public.story_comments;
+create policy "Story comments are visible to authenticated users"
+  on public.story_comments for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Users can comment stories as themselves" on public.story_comments;
+create policy "Users can comment stories as themselves"
+  on public.story_comments for insert
+  to authenticated
+  with check (auth.uid() = user_id);
 
 drop policy if exists "Post views are visible to authenticated users" on public.post_views;
 create policy "Post views are visible to authenticated users"

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Heart, MessageCircle, Share2 } from 'lucide-react';
+import { ArrowLeft, Heart, MessageCircle, Repeat2, Share2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { MOVIES } from '../data/mock';
 
@@ -9,9 +9,12 @@ export const PostPage: React.FC = () => {
   const navigate = useNavigate();
   const { posts, getUserById, toggleLikePost } = useApp();
   const post = posts.find(item => item.id === postId);
-  const postUser = getUserById(post?.userId);
+  const originalPost = post?.repostOfId ? posts.find(item => item.id === post.repostOfId) : null;
+  const displayPost = originalPost || post;
+  const postUser = getUserById(displayPost?.userId);
+  const reposter = post?.type === 'repost' ? getUserById(post.userId) : null;
 
-  if (!post || !postUser) {
+  if (!post || !displayPost || !postUser) {
     return (
       <div className="min-h-screen bg-[#17171B] text-white flex flex-col items-center justify-center p-6 text-center">
         <p className="text-zinc-400 mb-4">Postagem nao encontrada.</p>
@@ -22,8 +25,8 @@ export const PostPage: React.FC = () => {
     );
   }
 
-  const movie = post.movieId ? MOVIES.find(item => item.id === post.movieId) : null;
-  const displayImage = post.thumbnailUrl || movie?.posterUrl;
+  const movie = displayPost.movieId ? MOVIES.find(item => item.id === displayPost.movieId) : null;
+  const displayImage = displayPost.thumbnailUrl || movie?.posterUrl;
 
   return (
     <div className="min-h-screen bg-[#17171B] text-white pb-24">
@@ -54,16 +57,32 @@ export const PostPage: React.FC = () => {
               )}
               <div className="min-w-0 flex-1">
                 <p className="font-bold">{postUser.handle}</p>
-                <p className="mt-1 text-[15px] leading-relaxed whitespace-pre-line">{post.caption}</p>
+                <p className="mt-1 text-[15px] leading-relaxed whitespace-pre-line">{displayPost.caption}</p>
               </div>
             </div>
           </article>
         )}
 
+        {reposter && (
+          <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-zinc-400">
+              <Repeat2 size={16} />
+              <span>republicado por:</span>
+            </div>
+            {reposter.avatarUrl ? (
+              <img src={reposter.avatarUrl} alt={reposter.name} className="h-8 w-8 rounded-full object-cover" />
+            ) : (
+              <span className="h-8 w-8 rounded-full bg-[#3F1521] flex items-center justify-center text-xs text-white">
+                {reposter.name.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
+        )}
+
         {displayImage && (
           <p className="mt-4 text-sm leading-relaxed text-zinc-300">
             <span className="font-bold text-white mr-2">{postUser.handle}</span>
-            {post.caption || 'Sem legenda.'}
+            {displayPost.caption || 'Sem legenda.'}
           </p>
         )}
 

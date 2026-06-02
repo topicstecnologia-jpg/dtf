@@ -8,7 +8,7 @@ import { Post } from '../types';
 
 export const ProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount, toggleFollowUser, recordPostView, updatePost, deletePost } = useApp();
+  const { user: currentUser, posts: allPosts, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount, toggleFollowUser, recordPostView, updatePost, deletePost } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'reposts' | 'favorites'>('images');
   const [copied, setCopied] = useState(false);
@@ -49,6 +49,9 @@ export const ProfilePage: React.FC = () => {
   const isFollowing = Boolean(currentUser?.followingIds?.includes(profileUser.id));
   const posts = profileUser.posts || [];
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
+  const liveOriginalPost = liveSelectedPost?.repostOfId ? allPosts.find(post => post.id === liveSelectedPost.repostOfId) : null;
+  const liveDisplayPost = liveOriginalPost || liveSelectedPost;
+  const liveContentUser = liveOriginalPost ? getUserById(liveOriginalPost.userId) : profileUser;
   const favoriteMovies = (profileUser.favoriteMovies || []).map(id => MOVIES.find(m => m.id === id)).filter(Boolean);
   const loveTypeDescriptions: Record<string, string> = {
     'Sonhador Elegante': 'Conexao bonita, profunda e cheia de significado.',
@@ -373,8 +376,10 @@ export const ProfilePage: React.FC = () => {
         ) : (
           <>
             {filteredPosts.map((post) => {
-              const movie = post.movieId ? MOVIES.find(m => m.id === post.movieId) : null;
-              const displayImage = post.thumbnailUrl || movie?.posterUrl;
+              const originalPost = post.repostOfId ? allPosts.find(item => item.id === post.repostOfId) : null;
+              const displayPost = originalPost || post;
+              const movie = displayPost.movieId ? MOVIES.find(m => m.id === displayPost.movieId) : null;
+              const displayImage = displayPost.thumbnailUrl || movie?.posterUrl;
 
               return (
                 <button
@@ -391,7 +396,7 @@ export const ProfilePage: React.FC = () => {
                     />
                   ) : (
                     <div className="w-full h-full bg-[#222226] p-3 flex items-center justify-center text-center">
-                      <p className="text-xs font-semibold leading-snug line-clamp-6">{post.caption}</p>
+                      <p className="text-xs font-semibold leading-snug line-clamp-6">{displayPost.caption}</p>
                     </div>
                   )}
                   <div className="absolute bottom-2 left-2 flex items-center space-x-1 text-white text-xs drop-shadow-md">
@@ -399,8 +404,15 @@ export const ProfilePage: React.FC = () => {
                     <span>{post.views}</span>
                   </div>
                   {post.type === 'repost' && (
-                    <div className="absolute top-2 right-2 text-white drop-shadow-md">
-                      <Repeat size={16} />
+                    <div className="absolute inset-x-2 bottom-2 flex items-center justify-end gap-1.5 rounded-full bg-black/45 px-2 py-1 text-[10px] text-white backdrop-blur-md">
+                      <span>republicado por:</span>
+                      {profileUser.avatarUrl ? (
+                        <img src={profileUser.avatarUrl} alt={profileUser.name} className="h-4 w-4 rounded-full object-cover" />
+                      ) : (
+                        <span className="h-4 w-4 rounded-full bg-[#3F1521] flex items-center justify-center text-[8px]">
+                          {profileUser.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
                     </div>
                   )}
                 </button>
@@ -478,8 +490,8 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             {(() => {
-              const movie = liveSelectedPost.movieId ? MOVIES.find(m => m.id === liveSelectedPost.movieId) : null;
-              const displayImage = liveSelectedPost.thumbnailUrl || movie?.posterUrl;
+              const movie = liveDisplayPost?.movieId ? MOVIES.find(m => m.id === liveDisplayPost.movieId) : null;
+              const displayImage = liveDisplayPost?.thumbnailUrl || movie?.posterUrl;
 
               return displayImage ? (
                 <div className="aspect-[1080/1450] bg-zinc-900">
@@ -487,10 +499,29 @@ export const ProfilePage: React.FC = () => {
                 </div>
               ) : (
                 <div className="aspect-[1080/1450] bg-[#222226] p-8 flex items-center justify-center text-center">
-                  <p className="text-2xl font-bold leading-tight">{liveSelectedPost.caption}</p>
+                  <p className="text-2xl font-bold leading-tight">{liveDisplayPost?.caption}</p>
                 </div>
               );
             })()}
+
+            {liveSelectedPost.type === 'repost' && (
+              <div className="mx-5 mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-zinc-500">Perfil original</p>
+                  <p className="truncate text-sm font-bold text-white">{liveContentUser?.handle || 'Publicacao original'}</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                  <span>republicado por:</span>
+                  {profileUser.avatarUrl ? (
+                    <img src={profileUser.avatarUrl} alt={profileUser.name} className="h-7 w-7 rounded-full object-cover" />
+                  ) : (
+                    <span className="h-7 w-7 rounded-full bg-[#3F1521] flex items-center justify-center text-[10px] text-white">
+                      {profileUser.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="p-5 space-y-4">
               <div className="flex items-center justify-between text-sm text-zinc-400">
@@ -530,8 +561,8 @@ export const ProfilePage: React.FC = () => {
               ) : (
                 <>
                   <p className="text-sm leading-relaxed text-zinc-300">
-                    <span className="font-bold text-white mr-2">{profileUser.handle}</span>
-                    {liveSelectedPost.caption || 'Sem legenda.'}
+                    <span className="font-bold text-white mr-2">{liveContentUser?.handle || profileUser.handle}</span>
+                    {liveDisplayPost?.caption || 'Sem legenda.'}
                   </p>
                   {postActionError && <p className="text-sm text-red-300">{postActionError}</p>}
                 </>

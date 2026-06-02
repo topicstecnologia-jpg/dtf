@@ -22,6 +22,7 @@ export interface Comment {
 export interface Post {
   id: string;
   userId: string;
+  repostOfId?: string;
   movieId?: string;
   type: 'image' | 'video' | 'repost' | 'text';
   thumbnailUrl?: string;
@@ -40,6 +41,9 @@ export interface Story {
   type: 'image' | 'text';
   mediaUrl?: string;
   text?: string;
+  likes: number;
+  likedBy: string[];
+  comments: Comment[];
   timestamp: number;
   expiresAt?: number;
 }

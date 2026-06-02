@@ -32,6 +32,8 @@ interface AppContextType {
   repostPost: (postId: string) => Promise<void>;
   createStory: (values: { text?: string; imageFile?: File | null }) => Promise<void>;
   deleteStory: (storyId: string) => Promise<void>;
+  addStoryComment: (storyId: string, text: string) => Promise<void>;
+  toggleLikeStory: (storyId: string) => Promise<void>;
   recordPostView: (postId: string) => Promise<void>;
   getUserById: (userId?: string) => User | undefined;
   completeOnboarding: (answers: Record<string, string>) => Promise<void>;
@@ -143,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const mapPostRow = (row: any): Post => ({
     id: row.id,
     userId: row.user_id,
+    repostOfId: row.repost_of || undefined,
     movieId: row.movie_id || undefined,
     type: row.type,
     thumbnailUrl: row.thumbnail_url || undefined,
@@ -168,6 +171,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     type: row.type,
     mediaUrl: row.media_url || undefined,
     text: row.text || undefined,
+    likes: row.story_likes?.length || 0,
+    likedBy: (row.story_likes || []).map((like: any) => like.user_id),
+    comments: (row.story_comments || []).map((comment: any) => ({
+      id: comment.id,
+      userId: comment.user_id,
+      userName: comment.user_name,
+      userAvatar: comment.user_avatar,
+      text: comment.text,
+      timestamp: new Date(comment.created_at).getTime()
+    })),
     timestamp: new Date(row.created_at).getTime(),
     expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : undefined
   });
@@ -237,7 +250,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cutoff = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString();
     const { data, error } = await supabase
       .from('stories')
-      .select('*')
+      .select('*, story_likes(user_id), story_comments(*)')
       .gt('expires_at', new Date().toISOString())
       .gte('created_at', cutoff)
       .order('created_at', { ascending: false });
@@ -362,6 +375,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStories(prevStories => prevStories.filter(story => story.id !== storyId));
   };
 
+  const appendCommentToStory = (storyId: string, comment: Comment) => {
+    setStories(prevStories => prevStories.map(story => {
+      if (story.id !== storyId || story.comments.some(item => item.id === comment.id)) return story;
+      return { ...story, comments: [...story.comments, comment] };
+    }));
+  };
+
+  const applyLikeToStory = (storyId: string, userId: string, liked: boolean) => {
+    setStories(prevStories => prevStories.map(story => {
+      if (story.id !== storyId) return story;
+      const likedBy = liked
+        ? Array.from(new Set([...story.likedBy, userId]))
+        : story.likedBy.filter(id => id !== userId);
+      return { ...story, likedBy, likes: likedBy.length };
+    }));
+  };
+
   const updatePostEverywhere = (updatedPost: Post) => {
     const updateList = (items?: Post[]) => items?.map(post => post.id === updatedPost.id ? { ...post, ...updatedPost } : post);
 
@@ -455,6 +485,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           appendPost({
             id: row.id,
             userId: row.user_id,
+            repostOfId: row.repost_of || undefined,
             movieId: row.movie_id || undefined,
             type: row.type,
             thumbnailUrl: row.thumbnail_url || undefined,
@@ -473,6 +504,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (payload) => {
           const row = payload.new as any;
           patchPostEverywhere(row.id, {
+            repostOfId: row.repost_of || undefined,
             movieId: row.movie_id || undefined,
             type: row.type,
             thumbnailUrl: row.thumbnail_url || undefined,
@@ -538,6 +570,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         { event: 'DELETE', schema: 'public', table: 'stories' },
         (payload) => {
           removeStory((payload.old as any).id);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'story_comments' },
+        (payload) => {
+          const row = payload.new as any;
+          appendCommentToStory(row.story_id, {
+            id: row.id,
+            userId: row.user_id,
+            userName: row.user_name,
+            userAvatar: row.user_avatar,
+            text: row.text,
+            timestamp: new Date(row.created_at).getTime()
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'story_likes' },
+        (payload) => {
+          const row = payload.new as any;
+          applyLikeToStory(row.story_id, row.user_id, true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'story_likes' },
+        (payload) => {
+          const row = payload.old as any;
+          applyLikeToStory(row.story_id, row.user_id, false);
         }
       )
       .subscribe();
@@ -940,13 +1003,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const post = posts.find(item => item.id === postId);
     if (!post || post.userId !== user.id) throw new Error('Voce so pode excluir suas proprias postagens.');
 
-    const { error } = await supabase
-      .from('posts')
-      .delete()
-      .eq('id', postId)
-      .eq('user_id', user.id);
+    const { error } = await supabase.rpc('delete_own_post', { post_id: postId });
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      const rpcMissing = error.message.toLowerCase().includes('function') || error.message.toLowerCase().includes('schema cache');
+      if (!rpcMissing) throw new Error(error.message);
+
+      const { data: deletedRows, error: fallbackError } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', postId)
+        .eq('user_id', user.id)
+        .select('id');
+
+      if (fallbackError) throw new Error(fallbackError.message);
+      if (!deletedRows || deletedRows.length === 0) {
+        throw new Error('O banco nao confirmou a exclusao. Rode o schema atualizado no Supabase e tente novamente.');
+      }
+    }
+
     removePostEverywhere(postId);
   };
 
@@ -959,6 +1034,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .from('posts')
       .insert({
         user_id: user.id,
+        repost_of: post.repostOfId || post.id,
         movie_id: post.movieId || null,
         type: 'repost',
         thumbnail_url: post.thumbnailUrl || null,
@@ -1004,7 +1080,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         text: text || null,
         expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
       })
-      .select()
+      .select('*, story_likes(user_id), story_comments(*)')
       .single();
 
     if (error) {
@@ -1026,6 +1102,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (error) throw new Error(error.message);
 
     removeStory(storyId);
+  };
+
+  const addStoryComment = async (storyId: string, text: string) => {
+    if (!user || !supabase) return;
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+
+    const newComment: Comment = {
+      id: crypto.randomUUID(),
+      userId: user.id,
+      userName: user.name,
+      userAvatar: user.avatarUrl,
+      text: trimmedText,
+      timestamp: Date.now()
+    };
+
+    const { error } = await supabase.from('story_comments').insert({
+      id: newComment.id,
+      story_id: storyId,
+      user_id: user.id,
+      user_name: user.name,
+      user_avatar: user.avatarUrl,
+      text: trimmedText
+    });
+
+    if (error) throw new Error(error.message);
+    appendCommentToStory(storyId, newComment);
+  };
+
+  const toggleLikeStory = async (storyId: string) => {
+    if (!user || !supabase) return;
+    const story = stories.find(item => item.id === storyId);
+    if (!story) return;
+
+    const isLiked = story.likedBy.includes(user.id);
+    const { error } = isLiked
+      ? await supabase.from('story_likes').delete().eq('story_id', storyId).eq('user_id', user.id)
+      : await supabase.from('story_likes').insert({ story_id: storyId, user_id: user.id });
+
+    if (error) throw new Error(error.message);
+    applyLikeToStory(storyId, user.id, !isLiked);
   };
 
   const recordPostView = async (postId: string) => {
@@ -1253,6 +1370,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     repostPost,
     createStory,
     deleteStory,
+    addStoryComment,
+    toggleLikeStory,
     recordPostView,
     completeOnboarding,
     swipeMovie,
