@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { MOVIES } from '../data/mock';
 import {
   ArrowLeft,
   Send,
@@ -16,10 +17,20 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+type SharedPostPayload = {
+  kind: 'post_share';
+  postId: string;
+  authorName?: string;
+  authorHandle?: string;
+  caption?: string;
+  type?: string;
+  thumbnailUrl?: string;
+};
+
 export const ChatPage: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
-  const { user, chats, sendMessage, sendMediaMessage, matches, getUserById } = useApp();
+  const { user, chats, sendMessage, sendMediaMessage, matches, posts, getUserById } = useApp();
   const [inputText, setInputText] = useState('');
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -35,6 +46,44 @@ export const ChatPage: React.FC = () => {
   const otherUser = getUserById(otherUserId);
   const chat = chats.find(c => c.matchId === matchId);
   const messages = chat?.messages || [];
+
+  const getSharedPostFromText = (text?: string): SharedPostPayload | null => {
+    if (!text) return null;
+
+    try {
+      const payload = JSON.parse(text) as Partial<SharedPostPayload>;
+      if (payload.kind === 'post_share' && payload.postId) {
+        return {
+          kind: 'post_share',
+          postId: payload.postId,
+          authorName: payload.authorName,
+          authorHandle: payload.authorHandle,
+          caption: payload.caption,
+          type: payload.type,
+          thumbnailUrl: payload.thumbnailUrl
+        };
+      }
+    } catch {
+      // Older shared posts were sent as plain links. The regex below upgrades them visually.
+    }
+
+    const linkMatch = text.match(/\/post\/([a-zA-Z0-9-]+)/);
+    if (!linkMatch?.[1]) return null;
+
+    const post = posts.find(item => item.id === linkMatch[1]);
+    const author = post ? getUserById(post.userId) : null;
+    const movie = post?.movieId ? MOVIES.find(item => item.id === post.movieId) : null;
+
+    return {
+      kind: 'post_share',
+      postId: linkMatch[1],
+      authorName: author?.name || 'Publicacao',
+      authorHandle: author?.handle || '',
+      caption: post?.caption || 'Toque para ver o post',
+      type: post?.type,
+      thumbnailUrl: post?.thumbnailUrl || movie?.posterUrl || ''
+    };
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -189,6 +238,7 @@ export const ChatPage: React.FC = () => {
       <div className="h-full overflow-y-auto px-4 pt-24 pb-28 space-y-4 bg-[#17171B] scrollbar-hide overscroll-none">
         {messages.map((msg) => {
           const isMe = msg.senderId === user?.id;
+          const sharedPost = getSharedPostFromText(msg.text);
           return (
             <motion.div
               key={msg.id}
@@ -202,6 +252,7 @@ export const ChatPage: React.FC = () => {
                     ? 'bg-[#3F1521] text-white rounded-br-none'
                     : 'bg-[#2A2A30] text-gray-200 rounded-bl-none'
                 }`}
+                style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
               >
                 {msg.mediaUrl && (
                   <div className="mb-2 rounded-lg overflow-hidden">
@@ -221,7 +272,55 @@ export const ChatPage: React.FC = () => {
                     )}
                   </div>
                 )}
-                {msg.text && <p className="text-sm leading-relaxed">{msg.text}</p>}
+                {sharedPost ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/post/${sharedPost.postId}`)}
+                    className="block w-full overflow-hidden rounded-2xl border border-white/10 bg-[#101014] text-left hover:border-white/25 transition-colors"
+                  >
+                    {sharedPost.thumbnailUrl ? (
+                      <img
+                        src={sharedPost.thumbnailUrl}
+                        alt="Post compartilhado"
+                        className="w-full max-h-64 object-cover bg-black"
+                      />
+                    ) : (
+                      <div className="min-h-28 p-4 flex items-center justify-center bg-[#222226]">
+                        <p
+                          className="text-base font-bold text-white text-center leading-snug"
+                          style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                        >
+                          {sharedPost.caption || 'Post compartilhado'}
+                        </p>
+                      </div>
+                    )}
+                    <div className="p-3">
+                      <div className="flex items-center gap-2 text-xs text-zinc-400">
+                        <span className="font-bold text-white truncate">
+                          {sharedPost.authorHandle || sharedPost.authorName || 'Publicacao'}
+                        </span>
+                        <span>post</span>
+                      </div>
+                      {sharedPost.caption && sharedPost.thumbnailUrl && (
+                        <p
+                          className="mt-1 line-clamp-2 text-sm leading-snug text-zinc-200"
+                          style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                        >
+                          {sharedPost.caption}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ) : (
+                  msg.text && (
+                    <p
+                      className="text-sm leading-relaxed whitespace-pre-wrap"
+                      style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                    >
+                      {msg.text}
+                    </p>
+                  )
+                )}
                 <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-white/50' : 'text-gray-500'}`}>
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>

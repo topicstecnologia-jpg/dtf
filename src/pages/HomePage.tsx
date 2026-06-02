@@ -171,7 +171,18 @@ export const HomePage: React.FC = () => {
 
   const handleSendPostToChat = async (matchId: string) => {
     if (!postToSend) return;
-    await sendMessage(matchId, `Olha esse post: ${getPostUrl(postToSend.id)}`);
+    const author = getUserById(postToSend.userId);
+    const movie = postToSend.movieId ? MOVIES.find(item => item.id === postToSend.movieId) : null;
+
+    await sendMessage(matchId, JSON.stringify({
+      kind: 'post_share',
+      postId: postToSend.id,
+      authorName: author?.name || 'Usuario',
+      authorHandle: author?.handle || '',
+      caption: postToSend.caption,
+      type: postToSend.type,
+      thumbnailUrl: postToSend.thumbnailUrl || movie?.posterUrl || ''
+    }));
     setPostToSend(null);
     setPostActionMessage('Post enviado.');
     setTimeout(() => setPostActionMessage(''), 1800);
