@@ -14,6 +14,7 @@ import { MatchesPage } from './pages/MatchesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
 import { HomePage } from './pages/HomePage';
+import { PostPage } from './pages/PostPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { SplashScreen } from './components/SplashScreen';
 
@@ -61,7 +62,9 @@ export default function App() {
           <Route path="/matches" element={<ProtectedRoute><MatchesPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/profile/:userId" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/post/:postId" element={<ProtectedRoute><PostPage /></ProtectedRoute>} />
           <Route path="/chat/:matchId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </Router>
     </AppProvider>

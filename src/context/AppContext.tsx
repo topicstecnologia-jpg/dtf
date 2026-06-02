@@ -29,6 +29,7 @@ interface AppContextType {
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
   updatePost: (postId: string, values: { caption: string }) => Promise<void>;
   deletePost: (postId: string) => Promise<void>;
+  repostPost: (postId: string) => Promise<void>;
   createStory: (values: { text?: string; imageFile?: File | null }) => Promise<void>;
   deleteStory: (storyId: string) => Promise<void>;
   recordPostView: (postId: string) => Promise<void>;
@@ -949,6 +950,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     removePostEverywhere(postId);
   };
 
+  const repostPost = async (postId: string) => {
+    if (!user || !supabase) return;
+    const post = posts.find(item => item.id === postId);
+    if (!post) throw new Error('Postagem nao encontrada.');
+
+    const { data, error } = await supabase
+      .from('posts')
+      .insert({
+        user_id: user.id,
+        movie_id: post.movieId || null,
+        type: 'repost',
+        thumbnail_url: post.thumbnailUrl || null,
+        caption: post.caption
+      })
+      .select('*, comments(*), post_likes(user_id)')
+      .single();
+
+    if (error) throw new Error(error.message);
+    if (data) appendPost(mapPostRow(data));
+  };
+
   const createStory = async (values: { text?: string; imageFile?: File | null }) => {
     if (!user || !supabase) return;
 
@@ -1228,6 +1250,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createPost,
     updatePost,
     deletePost,
+    repostPost,
     createStory,
     deleteStory,
     recordPostView,

@@ -8,7 +8,7 @@ import { Post, Story } from '../types';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, posts, stories, addComment, toggleSavePost, toggleLikePost, profileUsers, getUserById, createStory, deleteStory } = useApp();
+  const { user, posts, stories, matches, sendMessage, addComment, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory } = useApp();
   const [activeTab, setActiveTab] = useState('Community');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
@@ -22,6 +22,8 @@ export const HomePage: React.FC = () => {
   const [profileSearch, setProfileSearch] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState<'all' | 'likes' | 'comments' | 'follows' | 'profiles'>('all');
+  const [postToSend, setPostToSend] = useState<Post | null>(null);
+  const [postActionMessage, setPostActionMessage] = useState('');
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
 
   const latestStoriesByUser = stories.reduce<Story[]>((latestStories, story) => {
@@ -147,6 +149,32 @@ export const HomePage: React.FC = () => {
         )}
       </div>
     );
+  };
+
+  const getPostUrl = (postId: string) => `${window.location.origin}/post/${postId}`;
+
+  const handleSharePost = async (post: Post) => {
+    await navigator.clipboard?.writeText(getPostUrl(post.id));
+    setPostActionMessage('Link copiado.');
+    setTimeout(() => setPostActionMessage(''), 1800);
+  };
+
+  const handleRepost = async (post: Post) => {
+    try {
+      await repostPost(post.id);
+      setPostActionMessage('Post republicado.');
+      setTimeout(() => setPostActionMessage(''), 1800);
+    } catch (error) {
+      setPostActionMessage(error instanceof Error ? error.message : 'Nao foi possivel republicar.');
+    }
+  };
+
+  const handleSendPostToChat = async (matchId: string) => {
+    if (!postToSend) return;
+    await sendMessage(matchId, `Olha esse post: ${getPostUrl(postToSend.id)}`);
+    setPostToSend(null);
+    setPostActionMessage('Post enviado.');
+    setTimeout(() => setPostActionMessage(''), 1800);
   };
 
   return (
@@ -499,7 +527,7 @@ export const HomePage: React.FC = () => {
                     key={post.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-[#111113] border border-white/10 px-4 py-4"
+                    className="bg-[#111113] border border-white/10 px-4 py-4 rounded-2xl"
                   >
                     <div className="flex items-start gap-3">
                       <button type="button" onClick={() => navigate(`/profile/${postUser.handle}`)} className="relative shrink-0">
@@ -539,10 +567,13 @@ export const HomePage: React.FC = () => {
                             <MessageCircle size={20} strokeWidth={1.7} />
                             <span>{post.comments.length}</span>
                           </button>
-                          <button className="hover:text-emerald-400">
+                          <button onClick={() => handleRepost(post)} className="hover:text-emerald-400" title="Republicar">
                             <Repeat2 size={20} strokeWidth={1.7} />
                           </button>
-                          <button className="hover:text-white">
+                          <button onClick={() => setPostToSend(post)} className="hover:text-white" title="Enviar">
+                            <Send size={20} strokeWidth={1.7} />
+                          </button>
+                          <button onClick={() => handleSharePost(post)} className="hover:text-white" title="Copiar link">
                             <Share2 size={20} strokeWidth={1.7} />
                           </button>
                         </div>
@@ -624,7 +655,25 @@ export const HomePage: React.FC = () => {
                             <span className="text-xs font-bold">{post.comments.length}</span>
                           )}
                         </button>
-                        <button className="text-white hover:text-green-500 transition-colors flex items-center space-x-1">
+                        <button
+                          onClick={() => handleRepost(post)}
+                          className="text-white hover:text-green-500 transition-colors flex items-center space-x-1"
+                          title="Republicar"
+                        >
+                          <Repeat2 size={26} strokeWidth={1.5} />
+                        </button>
+                        <button
+                          onClick={() => setPostToSend(post)}
+                          className="text-white hover:text-purple-400 transition-colors flex items-center space-x-1"
+                          title="Enviar"
+                        >
+                          <Send size={26} strokeWidth={1.5} />
+                        </button>
+                        <button
+                          onClick={() => handleSharePost(post)}
+                          className="text-white hover:text-green-500 transition-colors flex items-center space-x-1"
+                          title="Copiar link"
+                        >
                           <Share2 size={26} strokeWidth={1.5} />
                         </button>
                       </div>
@@ -651,6 +700,70 @@ export const HomePage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {postActionMessage && (
+        <div className="fixed top-20 left-1/2 z-[140] -translate-x-1/2 rounded-full bg-white px-4 py-2 text-sm font-bold text-black shadow-2xl">
+          {postActionMessage}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {postToSend && (
+          <div className="fixed inset-0 z-[130] flex items-end md:items-center justify-center p-0 md:p-5">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setPostToSend(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              className="relative w-full max-w-md rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#1F1F24] p-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-2xl font-bold">Enviar para</h2>
+                <button type="button" onClick={() => setPostToSend(null)} className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-80 overflow-y-auto scrollbar-hide">
+                {matches.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-zinc-500">Nenhuma conversa disponivel.</p>
+                ) : matches.map(match => {
+                  const otherUserId = match.userIds.find(id => id !== user?.id);
+                  const otherUser = getUserById(otherUserId);
+                  if (!otherUser) return null;
+
+                  return (
+                    <button
+                      key={match.id}
+                      type="button"
+                      onClick={() => handleSendPostToChat(match.id)}
+                      className="w-full flex items-center gap-3 rounded-2xl p-3 hover:bg-white/5 text-left"
+                    >
+                      {otherUser.avatarUrl ? (
+                        <img src={otherUser.avatarUrl} alt={otherUser.name} className="w-11 h-11 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-11 h-11 rounded-full bg-[#3F1521] flex items-center justify-center font-bold">
+                          {otherUser.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-white truncate">{otherUser.name}</p>
+                        <p className="text-xs text-zinc-500 truncate">{otherUser.handle}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isComposingScene && (
