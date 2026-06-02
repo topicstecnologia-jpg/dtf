@@ -333,6 +333,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
+  const applyLikeToPost = (postId: string, userId: string, liked: boolean) => {
+    const patchList = (items?: Post[]) => items?.map(post => {
+      if (post.id !== postId) return post;
+      const likedBy = liked
+        ? Array.from(new Set([...post.likedBy, userId]))
+        : post.likedBy.filter(id => id !== userId);
+      return { ...post, likedBy, likes: likedBy.length };
+    });
+
+    setPosts(prevPosts => patchList(prevPosts) || prevPosts);
+    setProfileUsers(prevProfiles => prevProfiles.map(profile => ({
+      ...profile,
+      posts: patchList(profile.posts)
+    })));
+    setUser(prevUser => prevUser ? { ...prevUser, posts: patchList(prevUser.posts) } : prevUser);
+  };
+
   const appendStory = (story: Story) => {
     setStories(prevStories => {
       if (prevStories.some(item => item.id === story.id)) return prevStories;
@@ -483,6 +500,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             text: row.text,
             timestamp: new Date(row.created_at).getTime()
           });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'post_likes' },
+        (payload) => {
+          const row = payload.new as any;
+          applyLikeToPost(row.post_id, row.user_id, true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'post_likes' },
+        (payload) => {
+          const row = payload.old as any;
+          applyLikeToPost(row.post_id, row.user_id, false);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles' },
+        () => {
+          loadProfiles();
         }
       )
       .on(

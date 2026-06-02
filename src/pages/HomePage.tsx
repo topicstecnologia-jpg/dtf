@@ -21,6 +21,7 @@ export const HomePage: React.FC = () => {
   const [commentText, setCommentText] = useState('');
   const [profileSearch, setProfileSearch] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notificationFilter, setNotificationFilter] = useState<'all' | 'likes' | 'comments' | 'follows' | 'profiles'>('all');
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
 
   const latestStoriesByUser = stories.reduce<Story[]>((latestStories, story) => {
@@ -66,7 +67,21 @@ export const HomePage: React.FC = () => {
     ...followerNotifications,
     ...recommendedProfiles
   ].slice(0, 16);
+  const filteredNotifications = notifications.filter((notification: any) => {
+    if (notificationFilter === 'all') return true;
+    if (notificationFilter === 'likes') return notification.type === 'like';
+    if (notificationFilter === 'comments') return notification.type === 'comment';
+    if (notificationFilter === 'follows') return notification.type === 'follow';
+    return notification.type === 'recommendation';
+  });
   const notificationCount = notifications.length;
+  const notificationTabs = [
+    { id: 'all', label: 'Tudo' },
+    { id: 'likes', label: 'Curtidas' },
+    { id: 'comments', label: 'Comentarios' },
+    { id: 'follows', label: 'Novos seguidores' },
+    { id: 'profiles', label: 'Perfis' }
+  ] as const;
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,6 +129,24 @@ export const HomePage: React.FC = () => {
     } catch (error) {
       setSceneError(error instanceof Error ? error.message : 'Nao foi possivel excluir a cena.');
     }
+  };
+
+  const renderNotificationPostPreview = (post?: Post) => {
+    if (!post) return null;
+    const movie = post.movieId ? MOVIES.find(item => item.id === post.movieId) : null;
+    const previewImage = post.thumbnailUrl || movie?.posterUrl;
+
+    return (
+      <div className="ml-2 w-12 h-12 rounded-xl overflow-hidden bg-[#17171B] border border-white/10 shrink-0">
+        {previewImage ? (
+          <img src={previewImage} alt="Publicacao" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full p-1.5 flex items-center justify-center text-[9px] font-bold text-center leading-tight text-white">
+            {post.caption || 'Texto'}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -181,17 +214,36 @@ export const HomePage: React.FC = () => {
           )}
 
           {isNotificationsOpen && (
-            <div className="absolute left-0 right-0 top-14 z-40 rounded-3xl border border-white/10 bg-[#222226] p-3 shadow-2xl">
-              <div className="flex items-center justify-between px-2 pb-2">
-                <h3 className="text-sm font-bold text-white">Notificacoes</h3>
+            <div className="absolute left-0 right-0 top-14 z-40 rounded-[28px] border border-white/10 bg-[#0F1012] p-4 shadow-2xl">
+              <div className="flex items-center justify-between pb-4">
+                <h3 className="text-2xl font-bold text-white">Notificacoes</h3>
                 <button type="button" onClick={() => setIsNotificationsOpen(false)} className="text-zinc-500 hover:text-white">
-                  <X size={16} />
+                  <X size={20} />
                 </button>
               </div>
-              <div className="max-h-80 overflow-y-auto space-y-1 pr-1">
-                {notifications.length === 0 ? (
-                  <p className="px-3 py-5 text-sm text-zinc-500 text-center">Nada novo por enquanto.</p>
-                ) : notifications.map((notification: any, index) => {
+
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3">
+                {notificationTabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setNotificationFilter(tab.id)}
+                    className={`h-9 px-4 rounded-full border text-xs font-bold whitespace-nowrap ${
+                      notificationFilter === tab.id
+                        ? 'bg-white text-black border-white'
+                        : 'bg-transparent text-white border-white/20 hover:border-white/40'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <p className="px-1 pb-2 text-sm font-bold text-white">Esta semana</p>
+              <div className="max-h-[65vh] md:max-h-[520px] overflow-y-auto scrollbar-hide space-y-1 pr-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                {filteredNotifications.length === 0 ? (
+                  <p className="px-3 py-8 text-sm text-zinc-500 text-center">Nada novo por enquanto.</p>
+                ) : filteredNotifications.map((notification: any, index) => {
                   const profile = notification.profile;
                   const message = notification.type === 'like'
                     ? 'curtiu sua publicacao'
@@ -209,9 +261,14 @@ export const HomePage: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setIsNotificationsOpen(false);
-                        navigate(`/profile/${profile.handle}`);
+                        if (notification.post) {
+                          setActiveTab('Feed');
+                          setSelectedPost(notification.post);
+                        } else {
+                          navigate(`/profile/${profile.handle}`);
+                        }
                       }}
-                      className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-white/5 transition-colors"
+                      className="w-full flex items-center gap-3 rounded-2xl px-2 py-3 text-left hover:bg-white/5 transition-colors"
                     >
                       {profile.avatarUrl ? (
                         <img src={profile.avatarUrl} alt={profile.name} className="w-10 h-10 rounded-full object-cover border border-white/10" />
@@ -221,11 +278,17 @@ export const HomePage: React.FC = () => {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm text-white truncate">
+                        <p className="text-sm text-white leading-snug line-clamp-2">
                           <span className="font-bold">{profile.handle}</span>
                           <span className="text-zinc-400"> {message}</span>
                         </p>
+                        {notification.post && (
+                          <p className="mt-1 text-xs text-zinc-500 line-clamp-1">
+                            {notification.post.caption || 'Publicacao sem legenda'}
+                          </p>
+                        )}
                       </div>
+                      {renderNotificationPostPreview(notification.post)}
                     </button>
                   );
                 })}
