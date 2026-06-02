@@ -2,15 +2,24 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { MOVIES } from '../data/mock';
-import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export const ProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, startChat, matches, getUserById, profileUsers } = useApp();
+  const { user: currentUser, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'reposts' | 'favorites'>('images');
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editHandle, setEditHandle] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const decodedParam = userId ? decodeURIComponent(userId) : '';
   const isCurrentUser = !userId || userId === currentUser?.id || decodedParam.toLowerCase() === currentUser?.handle?.toLowerCase();
@@ -49,6 +58,62 @@ export const ProfilePage: React.FC = () => {
     await navigator.clipboard?.writeText(profileUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
+  };
+
+  const openEditProfile = () => {
+    setEditName(profileUser.name);
+    setEditHandle(profileUser.handle.replace(/^@/, ''));
+    setEditEmail('');
+    setAvatarFile(null);
+    setAvatarPreview(profileUser.avatarUrl);
+    setEditError('');
+    setEditSuccess('');
+    setIsEditing(true);
+  };
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleSaveProfile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSaving(true);
+    setEditError('');
+    setEditSuccess('');
+
+    try {
+      await updateProfile({ name: editName, handle: editHandle, avatarFile });
+      if (editEmail.trim()) {
+        await updateEmail(editEmail.trim());
+        setEditSuccess('Perfil salvo. Confirme o novo email na sua caixa de entrada.');
+      } else {
+        setEditSuccess('Perfil salvo.');
+      }
+      setAvatarFile(null);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'Nao foi possivel salvar o perfil.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm('Tem certeza que deseja excluir sua conta? Essa acao nao pode ser desfeita.');
+    if (!confirmed) return;
+
+    setIsSaving(true);
+    setEditError('');
+
+    try {
+      await deleteAccount();
+      navigate('/');
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : 'Nao foi possivel excluir sua conta.');
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -119,7 +184,16 @@ export const ProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {!isCurrentUser && (
+        {isCurrentUser ? (
+          <div className="flex space-x-2 mb-5">
+            <button
+              onClick={openEditProfile}
+              className="bg-zinc-800 text-white px-8 py-2.5 rounded-lg text-sm font-medium hover:bg-zinc-700 transition-colors"
+            >
+              Editar perfil
+            </button>
+          </div>
+        ) : (
           <div className="flex space-x-2 mb-5">
             <button
               onClick={handleMessage}
@@ -238,6 +312,95 @@ export const ProfilePage: React.FC = () => {
           </>
         )}
       </div>
+
+      {isEditing && (
+        <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
+          <motion.form
+            onSubmit={handleSaveProfile}
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#1F1F24] p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Editar perfil</h2>
+              <button type="button" onClick={() => setIsEditing(false)} className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center mb-6">
+              <img
+                src={avatarPreview}
+                alt="Avatar"
+                className="w-24 h-24 rounded-full object-cover border border-white/10 mb-3"
+              />
+              <label className="flex items-center gap-2 rounded-full bg-zinc-800 px-4 py-2 text-sm font-medium cursor-pointer hover:bg-zinc-700">
+                <ImageIcon size={16} />
+                Alterar foto
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+              </label>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300 ml-1">Nome</label>
+                <input
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  className="w-full rounded-full bg-[#17171B] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25"
+                  placeholder="Seu nome"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300 ml-1">Nome de usuario</label>
+                <div className="relative">
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500">@</span>
+                  <input
+                    value={editHandle}
+                    onChange={(event) => setEditHandle(event.target.value)}
+                    className="w-full rounded-full bg-[#17171B] border border-white/10 py-4 pl-10 pr-5 text-white outline-none focus:border-white/25"
+                    placeholder="seunome"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300 ml-1">Novo email</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(event) => setEditEmail(event.target.value)}
+                  className="w-full rounded-full bg-[#17171B] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25"
+                  placeholder="preencha apenas se quiser alterar"
+                />
+              </div>
+            </div>
+
+            {editError && <p className="mt-4 text-sm text-red-300">{editError}</p>}
+            {editSuccess && <p className="mt-4 text-sm text-emerald-300">{editSuccess}</p>}
+
+            <div className="mt-6 space-y-3">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="w-full h-12 rounded-full bg-[#3F1521] hover:bg-[#5B343C] disabled:opacity-60 text-white font-bold transition-colors"
+              >
+                {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
+              </button>
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={handleDeleteAccount}
+                className="w-full h-12 rounded-full border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-60 font-bold transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 size={17} />
+                Excluir conta
+              </button>
+            </div>
+          </motion.form>
+        </div>
+      )}
     </div>
   );
 };

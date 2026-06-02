@@ -74,6 +74,58 @@ create unique index if not exists profiles_handle_unique_idx
   on public.profiles (lower(handle))
   where username_configured = true;
 
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Avatar files are public" on storage.objects;
+create policy "Avatar files are public"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+drop policy if exists "Users can upload their avatar" on storage.objects;
+create policy "Users can upload their avatar"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users can update their avatar" on storage.objects;
+create policy "Users can update their avatar"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users can remove their avatar" on storage.objects;
+create policy "Users can remove their avatar"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+create or replace function public.delete_current_user()
+returns void
+language plpgsql
+security definer set search_path = auth, public
+as $$
+begin
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+grant execute on function public.delete_current_user() to authenticated;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -117,38 +169,45 @@ alter table public.posts enable row level security;
 alter table public.comments enable row level security;
 alter table public.post_likes enable row level security;
 
+drop policy if exists "Profiles are visible to authenticated users" on public.profiles;
 create policy "Profiles are visible to authenticated users"
   on public.profiles for select
   to authenticated
   using (true);
 
+drop policy if exists "Users can insert their own profile" on public.profiles;
 create policy "Users can insert their own profile"
   on public.profiles for insert
   to authenticated
   with check (auth.uid() = id);
 
+drop policy if exists "Users can update their own profile" on public.profiles;
 create policy "Users can update their own profile"
   on public.profiles for update
   to authenticated
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
+drop policy if exists "Users can read their matches" on public.matches;
 create policy "Users can read their matches"
   on public.matches for select
   to authenticated
   using (auth.uid() = user_a or auth.uid() = user_b);
 
+drop policy if exists "Users can create matches involving themselves" on public.matches;
 create policy "Users can create matches involving themselves"
   on public.matches for insert
   to authenticated
   with check (auth.uid() = user_a or auth.uid() = user_b);
 
+drop policy if exists "Users can update matches involving themselves" on public.matches;
 create policy "Users can update matches involving themselves"
   on public.matches for update
   to authenticated
   using (auth.uid() = user_a or auth.uid() = user_b)
   with check (auth.uid() = user_a or auth.uid() = user_b);
 
+drop policy if exists "Users can read messages in their matches" on public.messages;
 create policy "Users can read messages in their matches"
   on public.messages for select
   to authenticated
@@ -160,6 +219,7 @@ create policy "Users can read messages in their matches"
     )
   );
 
+drop policy if exists "Users can send messages in their matches" on public.messages;
 create policy "Users can send messages in their matches"
   on public.messages for insert
   to authenticated
@@ -171,36 +231,43 @@ create policy "Users can send messages in their matches"
     )
   );
 
+drop policy if exists "Posts are visible to authenticated users" on public.posts;
 create policy "Posts are visible to authenticated users"
   on public.posts for select
   to authenticated
   using (true);
 
+drop policy if exists "Users can create their own posts" on public.posts;
 create policy "Users can create their own posts"
   on public.posts for insert
   to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Comments are visible to authenticated users" on public.comments;
 create policy "Comments are visible to authenticated users"
   on public.comments for select
   to authenticated
   using (true);
 
+drop policy if exists "Users can create their own comments" on public.comments;
 create policy "Users can create their own comments"
   on public.comments for insert
   to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Likes are visible to authenticated users" on public.post_likes;
 create policy "Likes are visible to authenticated users"
   on public.post_likes for select
   to authenticated
   using (true);
 
+drop policy if exists "Users can like as themselves" on public.post_likes;
 create policy "Users can like as themselves"
   on public.post_likes for insert
   to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can remove their own likes" on public.post_likes;
 create policy "Users can remove their own likes"
   on public.post_likes for delete
   to authenticated

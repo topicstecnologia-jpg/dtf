@@ -21,6 +21,9 @@ interface AppContextType {
   updatePassword: (password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateHandle: (handle: string) => Promise<void>;
+  updateProfile: (values: { name: string; handle: string; avatarFile?: File | null }) => Promise<void>;
+  updateEmail: (email: string) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   getUserById: (userId?: string) => User | undefined;
   completeOnboarding: (answers: Record<string, string>) => Promise<void>;
   swipeMovie: (movieId: string, direction: 'left' | 'right') => Promise<void>;
@@ -277,6 +280,99 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setUser(updatedUser);
     setProfileUsers(prev => prev.map(profile => profile.id === user.id ? updatedUser : profile));
+  };
+
+  const uploadAvatar = async (file: File) => {
+    if (!user || !supabase) return user?.avatarUrl || '';
+
+    const extension = file.name.split('.').pop() || 'jpg';
+    const filePath = `${user.id}/avatar-${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) throw new Error(uploadError.message);
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const updateProfile = async (values: { name: string; handle: string; avatarFile?: File | null }) => {
+    if (!user || !supabase) return;
+
+    const normalizedHandle = normalizeHandle(values.handle);
+    if (!values.name.trim()) throw new Error('Informe seu nome.');
+    if (!normalizedHandle || normalizedHandle.length < 4) {
+      throw new Error('Escolha um @ com pelo menos 3 caracteres.');
+    }
+
+    const { data: existingProfile, error: lookupError } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('handle', normalizedHandle)
+      .neq('id', user.id)
+      .maybeSingle();
+
+    if (lookupError) throw new Error(lookupError.message);
+    if (existingProfile) throw new Error('Esse @ ja esta em uso.');
+
+    const avatarUrl = values.avatarFile ? await uploadAvatar(values.avatarFile) : user.avatarUrl;
+    const updatedUser = {
+      ...user,
+      name: values.name.trim(),
+      handle: normalizedHandle,
+      avatarUrl,
+      usernameConfigured: true
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        name: updatedUser.name,
+        handle: updatedUser.handle,
+        avatar_url: updatedUser.avatarUrl,
+        username_configured: true
+      })
+      .eq('id', user.id);
+
+    if (error) {
+      if (error.code !== 'PGRST204') throw new Error(error.message);
+
+      const { error: fallbackError } = await supabase
+        .from('profiles')
+        .update({
+          name: updatedUser.name,
+          handle: updatedUser.handle,
+          avatar_url: updatedUser.avatarUrl
+        })
+        .eq('id', user.id);
+
+      if (fallbackError) throw new Error(fallbackError.message);
+    }
+
+    setUser(updatedUser);
+    setProfileUsers(prev => prev.map(profile => profile.id === user.id ? updatedUser : profile));
+  };
+
+  const updateEmail = async (email: string) => {
+    if (!supabase) throw new Error('Supabase nao esta configurado.');
+    const { error } = await supabase.auth.updateUser(
+      { email },
+      { emailRedirectTo: getAuthRedirectUrl('/home') }
+    );
+
+    if (error) throw new Error(error.message);
+  };
+
+  const deleteAccount = async () => {
+    if (!supabase) throw new Error('Supabase nao esta configurado.');
+    const { error } = await supabase.rpc('delete_current_user');
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    await logout();
   };
 
   const resendConfirmation = async (email: string) => {
@@ -546,6 +642,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updatePassword,
     logout,
     getUserById,
+    updateProfile,
+    updateEmail,
+    deleteAccount,
     completeOnboarding,
     swipeMovie,
     getRecommendedMovies,
