@@ -78,6 +78,10 @@ insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do update set public = true;
 
+insert into storage.buckets (id, name, public)
+values ('chat-media', 'chat-media', true)
+on conflict (id) do update set public = true;
+
 drop policy if exists "Avatar files are public" on storage.objects;
 create policy "Avatar files are public"
   on storage.objects for select
@@ -113,6 +117,61 @@ create policy "Users can remove their avatar"
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+drop policy if exists "Chat media files are public" on storage.objects;
+create policy "Chat media files are public"
+  on storage.objects for select
+  using (bucket_id = 'chat-media');
+
+drop policy if exists "Users can upload chat media for their matches" on storage.objects;
+create policy "Users can upload chat media for their matches"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'chat-media'
+    and exists (
+      select 1 from public.matches
+      where matches.id::text = (storage.foldername(name))[1]
+      and (matches.user_a = auth.uid() or matches.user_b = auth.uid())
+    )
+  );
+
+drop policy if exists "Users can update chat media for their matches" on storage.objects;
+create policy "Users can update chat media for their matches"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'chat-media'
+    and exists (
+      select 1 from public.matches
+      where matches.id::text = (storage.foldername(name))[1]
+      and (matches.user_a = auth.uid() or matches.user_b = auth.uid())
+    )
+  )
+  with check (
+    bucket_id = 'chat-media'
+    and exists (
+      select 1 from public.matches
+      where matches.id::text = (storage.foldername(name))[1]
+      and (matches.user_a = auth.uid() or matches.user_b = auth.uid())
+    )
+  );
+
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'messages'
+    )
+  then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+end;
+$$;
 
 create or replace function public.delete_current_user()
 returns void

@@ -29,6 +29,7 @@ interface AppContextType {
   swipeMovie: (movieId: string, direction: 'left' | 'right') => Promise<void>;
   getRecommendedMovies: (mood: string) => Movie[];
   sendMessage: (matchId: string, text?: string, media?: { url: string, type: 'image' | 'video' | 'audio' }) => Promise<void>;
+  sendMediaMessage: (matchId: string, file: File | Blob, type: 'image' | 'video' | 'audio') => Promise<void>;
   startChat: (targetUserId: string) => Promise<string>;
   addComment: (postId: string, text: string) => Promise<void>;
   toggleSavePost: (postId: string) => Promise<void>;
@@ -188,6 +189,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => data.subscription.unsubscribe();
   }, []);
+
+  const appendMessageToChat = (matchId: string, message: Message) => {
+    setChats(prevChats => {
+      const chatIndex = prevChats.findIndex(chat => chat.matchId === matchId);
+
+      if (chatIndex >= 0) {
+        const existingChat = prevChats[chatIndex];
+        if (existingChat.messages.some(item => item.id === message.id)) return prevChats;
+
+        const updatedChats = [...prevChats];
+        updatedChats[chatIndex] = {
+          ...existingChat,
+          messages: [...existingChat.messages, message]
+        };
+        return updatedChats;
+      }
+
+      return [...prevChats, { id: `chat-${matchId}`, matchId, messages: [message] }];
+    });
+  };
+
+  useEffect(() => {
+    if (!supabase || !user) return;
+    const realtimeClient = supabase;
+
+    const channel = realtimeClient
+      .channel(`messages:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const row = payload.new as any;
+          appendMessageToChat(row.match_id, {
+            id: row.id,
+            senderId: row.sender_id,
+            text: row.text || undefined,
+            mediaUrl: row.media_url || undefined,
+            mediaType: row.media_type || undefined,
+            timestamp: new Date(row.created_at).getTime()
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      realtimeClient.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   const login = async (email: string, password: string) => {
     if (!supabase) throw new Error('Supabase nao esta configurado.');
@@ -522,19 +571,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timestamp: new Date(data.created_at).getTime()
     };
 
-    setChats(prevChats => {
-      const chatIndex = prevChats.findIndex(chat => chat.matchId === matchId);
-      if (chatIndex >= 0) {
-        const updatedChats = [...prevChats];
-        updatedChats[chatIndex] = {
-          ...updatedChats[chatIndex],
-          messages: [...updatedChats[chatIndex].messages, newMessage]
-        };
-        return updatedChats;
-      }
+    appendMessageToChat(matchId, newMessage);
+  };
 
-      return [...prevChats, { id: `chat-${matchId}`, matchId, messages: [newMessage] }];
-    });
+  const sendMediaMessage = async (matchId: string, file: File | Blob, type: 'image' | 'video' | 'audio') => {
+    if (!user || !supabase) return;
+
+    const extensionByType = {
+      image: 'jpg',
+      video: 'mp4',
+      audio: 'webm'
+    };
+    const originalName = file instanceof File ? file.name : '';
+    const extension = originalName.split('.').pop() || extensionByType[type];
+    const filePath = `${matchId}/${user.id}-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('chat-media')
+      .upload(filePath, file, {
+        contentType: file.type || undefined,
+        upsert: false
+      });
+
+    if (uploadError) throw new Error(uploadError.message);
+
+    const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+    await sendMessage(matchId, undefined, { url: data.publicUrl, type });
   };
 
   const startChat = async (targetUserId: string): Promise<string> => {
@@ -649,6 +711,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     swipeMovie,
     getRecommendedMovies,
     sendMessage,
+    sendMediaMessage,
     startChat,
     addComment,
     toggleSavePost,
