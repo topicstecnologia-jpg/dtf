@@ -80,12 +80,15 @@ export interface Match {
 }
 
 export type EmotionalProfileType = 
-  | 'Romântico Idealista'
-  | 'Explorador Existencial'
-  | 'Amante de Histórias Intensas'
-  | 'Sonhador Nostálgico'
-  | 'Coração Dramático'
+  | 'Sonhador Elegante'
+  | 'Intenso Magnetico'
+  | 'Guardiao Leal'
+  | 'Alma Livre'
+  | 'Coracao Nostalgico'
+  | 'Romantico Visionario'
+  | 'Encanto Misterioso'
   | 'Romantico Idealista'
+  | 'Explorador Existencial'
   | 'Amante de Historias Intensas'
   | 'Sonhador Nostalgico'
   | 'Coracao Dramatico';

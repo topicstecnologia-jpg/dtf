@@ -42,6 +42,15 @@ export const ProfilePage: React.FC = () => {
   const isFollowing = Boolean(currentUser?.followingIds?.includes(profileUser.id));
   const posts = profileUser.posts || [];
   const favoriteMovies = (profileUser.favoriteMovies || []).map(id => MOVIES.find(m => m.id === id)).filter(Boolean);
+  const loveTypeDescriptions: Record<string, string> = {
+    'Sonhador Elegante': 'Conexao bonita, profunda e cheia de significado.',
+    'Intenso Magnetico': 'Paixao, presenca, quimica e entrega.',
+    'Guardiao Leal': 'Cuidado, compromisso e seguranca emocional.',
+    'Alma Livre': 'Leveza, espontaneidade e liberdade.',
+    'Coracao Nostalgico': 'Memoria, detalhes e gestos simbolicos.',
+    'Romantico Visionario': 'Parceria, futuro e sonhos compartilhados.',
+    'Encanto Misterioso': 'Profundidade, seletividade e descoberta aos poucos.'
+  };
 
   const filteredPosts = posts.filter(post => {
     if (activeTab === 'images') return post.type === 'image' || post.type === 'video' || post.type === 'text';
@@ -235,6 +244,15 @@ export const ProfilePage: React.FC = () => {
           <p className="text-sm leading-relaxed mb-2">
             {profileUser.bio || 'Sem bio disponivel.'}
           </p>
+          {profileUser.emotionalProfile && (
+            <div className="mb-3 rounded-2xl border border-[#3F1521]/40 bg-[#3F1521]/15 px-4 py-3 text-left">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#E4B5C2]">Tipo de amor</p>
+              <p className="mt-1 text-sm font-bold text-white">{profileUser.emotionalProfile}</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                {loveTypeDescriptions[profileUser.emotionalProfile] || 'Um jeito unico de viver conexoes.'}
+              </p>
+            </div>
+          )}
           <div className="flex items-center justify-center space-x-2 text-sm font-medium text-zinc-300">
             <Camera size={15} />
             <span>{profileUser.handle}</span>

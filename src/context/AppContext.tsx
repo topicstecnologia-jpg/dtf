@@ -679,13 +679,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    const topTrait = sorted[0]?.[0] || 'romantic';
+    const topTrait = sorted[0]?.[0] || 'elegant_dreamer';
+    const loveTypeByTrait: Record<string, EmotionalProfileType> = {
+      elegant_dreamer: 'Sonhador Elegante',
+      magnetic_intense: 'Intenso Magnetico',
+      loyal_guardian: 'Guardiao Leal',
+      free_soul: 'Alma Livre',
+      nostalgic_heart: 'Coracao Nostalgico',
+      visionary_romantic: 'Romantico Visionario',
+      mysterious_charm: 'Encanto Misterioso',
+      romantic: 'Sonhador Elegante',
+      intense: 'Intenso Magnetico',
+      dreamer: 'Coracao Nostalgico',
+      dramatic: 'Intenso Magnetico',
+      existential: 'Encanto Misterioso'
+    };
 
-    let profile: EmotionalProfileType = 'Romantico Idealista';
-    if (topTrait === 'existential') profile = 'Explorador Existencial';
-    if (topTrait === 'intense') profile = 'Amante de Historias Intensas';
-    if (topTrait === 'dreamer') profile = 'Sonhador Nostalgico';
-    if (topTrait === 'dramatic') profile = 'Coracao Dramatico';
+    const profile = loveTypeByTrait[topTrait] || 'Sonhador Elegante';
 
     const updatedUser = { ...user, emotionalProfile: profile, onboardingCompleted: true };
     setUser(updatedUser);

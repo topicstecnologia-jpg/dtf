@@ -12,14 +12,31 @@ export const OnboardingPage: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [swipedMovies, setSwipedMovies] = useState<string[]>([]);
-  const [calculatedProfile, setCalculatedProfile] = useState<string>('Romantico Idealista');
+  const [calculatedProfile, setCalculatedProfile] = useState<string>('Sonhador Elegante');
 
   const profileDescriptions: Record<string, string> = {
-    'Romantico Idealista': 'Voce acredita no poder transformador do amor e busca conexoes profundas que transcendem o cotidiano.',
-    'Explorador Existencial': 'Sua jornada e marcada pela busca por significado e pela compreensao das complexidades da vida.',
-    'Amante de Historias Intensas': 'Voce se atrai por narrativas viscerais e personagens que vivem cada momento com paixao absoluta.',
-    'Sonhador Nostalgico': 'O passado e as memorias tem um lugar especial no seu coracao, guiando sua busca por beleza.',
-    'Coracao Dramatico': 'Voce abraca a montanha-russa das emocoes humanas, encontrando beleza na vulnerabilidade.'
+    'Sonhador Elegante': 'Ama com idealizacao, sensibilidade e romantismo. Busca uma conexao bonita, profunda e cheia de significado.',
+    'Intenso Magnetico': 'Vive o amor com paixao, presenca e entrega. E atraido por conexoes fortes, cheias de quimica, desejo e emocao.',
+    'Guardiao Leal': 'Ama com constancia, cuidado e protecao. Valoriza confianca, compromisso e seguranca emocional.',
+    'Alma Livre': 'Se conecta pela leveza, espontaneidade e liberdade. Prefere relacoes naturais, onde o amor flui sem perder a individualidade.',
+    'Coracao Nostalgico': 'Ama com memoria, detalhe e profundidade emocional. Valoriza gestos simbolicos, lembrancas especiais e clima de filme antigo.',
+    'Romantico Visionario': 'Enxerga o amor como parceria de futuro. Busca crescimento, sonhos compartilhados e uma vida construida a dois.',
+    'Encanto Misterioso': 'Ama de forma profunda, seletiva e envolvente. Gosta de conexoes que despertam curiosidade e descoberta aos poucos.'
+  };
+
+  const loveTypeByTrait: Record<string, string> = {
+    elegant_dreamer: 'Sonhador Elegante',
+    magnetic_intense: 'Intenso Magnetico',
+    loyal_guardian: 'Guardiao Leal',
+    free_soul: 'Alma Livre',
+    nostalgic_heart: 'Coracao Nostalgico',
+    visionary_romantic: 'Romantico Visionario',
+    mysterious_charm: 'Encanto Misterioso',
+    romantic: 'Sonhador Elegante',
+    intense: 'Intenso Magnetico',
+    dreamer: 'Coracao Nostalgico',
+    dramatic: 'Intenso Magnetico',
+    existential: 'Encanto Misterioso'
   };
 
   const question = ONBOARDING_QUESTIONS[currentQuestionIndex];
@@ -32,13 +49,8 @@ export const OnboardingPage: React.FC = () => {
       counts[value] = (counts[value] || 0) + 1;
     });
 
-    const topTrait = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'romantic';
-
-    if (topTrait === 'existential') return 'Explorador Existencial';
-    if (topTrait === 'intense') return 'Amante de Historias Intensas';
-    if (topTrait === 'dreamer') return 'Sonhador Nostalgico';
-    if (topTrait === 'dramatic') return 'Coracao Dramatico';
-    return 'Romantico Idealista';
+    const topTrait = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'elegant_dreamer';
+    return loveTypeByTrait[topTrait] || 'Sonhador Elegante';
   };
 
   const handleOptionSelect = (value: string) => {

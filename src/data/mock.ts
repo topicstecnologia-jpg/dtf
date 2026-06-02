@@ -99,7 +99,7 @@ export const MOCK_USERS: User[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
     coverUrl: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&w=800&q=80',
     bio: 'Cinema é a vida com as partes chatas cortadas. Amante de romances e dramas.',
-    emotionalProfile: 'Romântico Idealista',
+    emotionalProfile: 'Sonhador Elegante',
     likedMovies: ['1', '3', '7'],
     dislikedMovies: ['6'],
     favoriteMovies: ['1', '3'],
@@ -146,7 +146,7 @@ export const MOCK_USERS: User[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
     coverUrl: 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=800&q=80',
     bio: 'Explorando o multiverso e o existencialismo através da sétima arte.',
-    emotionalProfile: 'Explorador Existencial',
+    emotionalProfile: 'Encanto Misterioso',
     likedMovies: ['2', '4', '6'],
     dislikedMovies: ['3'],
     favoriteMovies: ['2', '4'],
@@ -180,7 +180,7 @@ export const MOCK_USERS: User[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
     coverUrl: 'https://images.unsplash.com/photo-1460723237483-7a6dc9d0b212?auto=format&fit=crop&w=800&q=80',
     bio: 'Cores, luzes e emoções intensas. O cinema é minha pintura favorita.',
-    emotionalProfile: 'Amante de Histórias Intensas',
+    emotionalProfile: 'Intenso Magnetico',
     likedMovies: ['5', '6', '1'],
     dislikedMovies: ['8'],
     favoriteMovies: ['5', '6'],
@@ -212,42 +212,54 @@ export const MOCK_USERS: User[] = [
 export const ONBOARDING_QUESTIONS: Question[] = [
   {
     id: 'q1',
-    text: 'O que mais te prende em um filme?',
+    text: 'O que mais te prende em uma historia de amor?',
     options: [
-      { text: 'Conexão emocional profunda entre personagens', value: 'romantic' },
-      { text: 'Conceitos filosóficos e complexos', value: 'existential' },
-      { text: 'Drama intenso e grandes riscos', value: 'intense' },
-      { text: 'Beleza visual e atmosfera', value: 'dreamer' }
+      { text: 'Uma conexao bonita, sensivel e cheia de significado', value: 'elegant_dreamer' },
+      { text: 'Quimica forte, desejo e emocao no ar', value: 'magnetic_intense' },
+      { text: 'Cuidado, confianca e presenca constante', value: 'loyal_guardian' },
+      { text: 'Leveza, espontaneidade e liberdade', value: 'free_soul' },
+      { text: 'Detalhes, memorias e gestos simbolicos', value: 'nostalgic_heart' },
+      { text: 'Planos, crescimento e futuro compartilhado', value: 'visionary_romantic' },
+      { text: 'Misterio, curiosidade e descoberta aos poucos', value: 'mysterious_charm' }
     ]
   },
   {
     id: 'q2',
-    text: 'Como você prefere os finais?',
+    text: 'Qual clima combina mais com voce?',
     options: [
-      { text: 'Felizes para sempre', value: 'romantic' },
-      { text: 'Ambíguos e reflexivos', value: 'existential' },
-      { text: 'Trágicos mas significativos', value: 'dramatic' },
-      { text: 'Agridoces e realistas', value: 'dreamer' }
+      { text: 'Um romance elegante, quase cinematografico', value: 'elegant_dreamer' },
+      { text: 'Uma paixao que muda o ritmo de tudo', value: 'magnetic_intense' },
+      { text: 'Um amor seguro, honesto e protetor', value: 'loyal_guardian' },
+      { text: 'Uma relacao natural, sem peso desnecessario', value: 'free_soul' },
+      { text: 'Um encontro com cheiro de lembranca antiga', value: 'nostalgic_heart' },
+      { text: 'Uma parceria que inspira uma vida maior', value: 'visionary_romantic' },
+      { text: 'Uma conexao rara, intensa e pouco obvia', value: 'mysterious_charm' }
     ]
   },
   {
     id: 'q3',
-    text: 'Que tipo de jornada emocional você busca?',
+    text: 'O que voce mais valoriza em uma conexao?',
     options: [
-      { text: 'Conforto e calor', value: 'romantic' },
-      { text: 'Desafio e confusão mental', value: 'existential' },
-      { text: 'Adrenalina e choque', value: 'intense' },
-      { text: 'Nostalgia e saudade', value: 'dreamer' }
+      { text: 'Profundidade emocional e beleza nos detalhes', value: 'elegant_dreamer' },
+      { text: 'Entrega, presenca e intensidade', value: 'magnetic_intense' },
+      { text: 'Compromisso, lealdade e estabilidade', value: 'loyal_guardian' },
+      { text: 'Individualidade, humor e fluidez', value: 'free_soul' },
+      { text: 'Historia, memoria e pequenos rituais', value: 'nostalgic_heart' },
+      { text: 'Admiracao, ambicao e sonhos em comum', value: 'visionary_romantic' },
+      { text: 'Profundidade seletiva e tensao emocional', value: 'mysterious_charm' }
     ]
   },
   {
     id: 'q4',
-    text: 'Escolha um cenário para sua história ideal:',
+    text: 'Escolha uma cena para sua historia ideal:',
     options: [
-      { text: 'Um apartamento aconchegante em dia de chuva', value: 'romantic' },
-      { text: 'A vastidão do espaço ou tempo', value: 'existential' },
-      { text: 'Um ambiente urbano realista e cru', value: 'intense' },
-      { text: 'Uma era passada estilizada e colorida', value: 'dreamer' }
+      { text: 'Um jantar bonito, luz baixa e conversa infinita', value: 'elegant_dreamer' },
+      { text: 'Uma pista cheia, olhares cruzados e coracao acelerado', value: 'magnetic_intense' },
+      { text: 'Uma casa tranquila onde os dois se sentem em paz', value: 'loyal_guardian' },
+      { text: 'Uma viagem sem roteiro, rindo de tudo pelo caminho', value: 'free_soul' },
+      { text: 'Uma carta guardada, uma musica antiga e saudade boa', value: 'nostalgic_heart' },
+      { text: 'Dois planos na mesa e uma vida sendo desenhada', value: 'visionary_romantic' },
+      { text: 'Um encontro noturno, silencios longos e curiosidade', value: 'mysterious_charm' }
     ]
   }
 ];
