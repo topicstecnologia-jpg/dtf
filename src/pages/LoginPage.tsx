@@ -14,6 +14,7 @@ export const LoginPage: React.FC = () => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [handle, setHandle] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,7 +78,7 @@ export const LoginPage: React.FC = () => {
 
     try {
       if (mode === 'signup') {
-        await signUp(email, password, name);
+        await signUp(email, password, name, handle);
       } else {
         await login(email, password);
       }
@@ -207,16 +208,31 @@ export const LoginPage: React.FC = () => {
                   />
                 </div>
                 {mode === 'signup' && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-300 ml-1">Nome</label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full px-6 py-4 rounded-full bg-[#222226] border border-gray-700 text-white focus:border-wine-900 focus:ring-1 focus:ring-wine-900 outline-none transition-all placeholder-gray-600"
-                      placeholder="Seu nome"
-                    />
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-300 ml-1">Nome</label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-6 py-4 rounded-full bg-[#222226] border border-gray-700 text-white focus:border-wine-900 focus:ring-1 focus:ring-wine-900 outline-none transition-all placeholder-gray-600"
+                        placeholder="Seu nome"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-300 ml-1">@ de usuario</label>
+                      <div className="relative">
+                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500">@</span>
+                        <input
+                          type="text"
+                          value={handle}
+                          onChange={(e) => setHandle(e.target.value)}
+                          className="w-full px-6 py-4 pl-10 rounded-full bg-[#222226] border border-gray-700 text-white focus:border-wine-900 focus:ring-1 focus:ring-wine-900 outline-none transition-all placeholder-gray-600"
+                          placeholder="seunome"
+                        />
+                      </div>
+                    </div>
+                  </>
                 )}
               </motion.div>
             ) : (

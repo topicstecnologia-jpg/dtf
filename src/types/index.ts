@@ -36,6 +36,7 @@ export interface User {
   id: string;
   name: string;
   handle: string;
+  usernameConfigured?: boolean;
   avatarUrl: string;
   coverUrl?: string;
   bio?: string;

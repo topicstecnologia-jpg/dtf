@@ -4,6 +4,7 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null,
   handle text not null,
+  username_configured boolean not null default false,
   avatar_url text,
   cover_url text,
   bio text,
@@ -66,6 +67,13 @@ create table if not exists public.post_likes (
   primary key (post_id, user_id)
 );
 
+alter table public.profiles
+  add column if not exists username_configured boolean not null default false;
+
+create unique index if not exists profiles_handle_unique_idx
+  on public.profiles (lower(handle))
+  where username_configured = true;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -74,16 +82,19 @@ as $$
 declare
   display_name text;
   normalized_handle text;
+  requested_handle text;
 begin
   display_name := coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1), 'Usuario');
-  normalized_handle := lower(regexp_replace(display_name, '[^a-zA-Z0-9]+', '_', 'g'));
+  requested_handle := nullif(trim(both '@' from coalesce(new.raw_user_meta_data->>'handle', '')), '');
+  normalized_handle := lower(regexp_replace(coalesce(requested_handle, display_name), '[^a-zA-Z0-9_]+', '_', 'g'));
   normalized_handle := trim(both '_' from normalized_handle);
 
-  insert into public.profiles (id, name, handle, avatar_url, cover_url, bio)
+  insert into public.profiles (id, name, handle, username_configured, avatar_url, cover_url, bio)
   values (
     new.id,
     display_name,
     '@' || coalesce(nullif(normalized_handle, ''), 'usuario'),
+    requested_handle is not null,
     'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
     'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
     'Apaixonado por cinema.'

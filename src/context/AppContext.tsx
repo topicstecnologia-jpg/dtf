@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment } from '../types';
 import { MOVIES } from '../data/mock';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { createDefaultProfile, mapProfileRowToUser, mapUserToProfileRow } from '../lib/profile';
+import { createDefaultProfile, mapProfileRowToUser, mapUserToProfileRow, normalizeHandle } from '../lib/profile';
 
 interface AppContextType {
   user: User | null;
@@ -15,11 +15,12 @@ interface AppContextType {
   isLoading: boolean;
   authError: string;
   login: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name?: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string, handle?: string) => Promise<void>;
   resendConfirmation: (email: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateHandle: (handle: string) => Promise<void>;
   getUserById: (userId?: string) => User | undefined;
   completeOnboarding: (answers: Record<string, string>) => Promise<void>;
   swipeMovie: (movieId: string, direction: 'left' | 'right') => Promise<void>;
@@ -203,14 +204,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return `${window.location.origin}${path}`;
   };
 
-  const signUp = async (email: string, password: string, name?: string) => {
+  const signUp = async (email: string, password: string, name?: string, handle?: string) => {
     if (!supabase) throw new Error('Supabase nao esta configurado.');
     setAuthError('');
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name: name || email.split('@')[0] },
+        data: { name: name || email.split('@')[0], handle },
         emailRedirectTo: getAuthRedirectUrl('/home')
       }
     });
@@ -227,11 +228,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (data.user) {
-      const profile = createDefaultProfile(data.user.id, email, name);
+      const profile = createDefaultProfile(data.user.id, email, name, handle);
       await persistProfile(profile);
       setUser(profile);
       await refreshAppData(data.user.id);
     }
+  };
+
+  const updateHandle = async (handle: string) => {
+    if (!user || !supabase) return;
+
+    const normalizedHandle = normalizeHandle(handle);
+    if (!normalizedHandle || normalizedHandle.length < 4) {
+      throw new Error('Escolha um @ com pelo menos 3 caracteres.');
+    }
+
+    const { data: existingProfile, error: lookupError } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('handle', normalizedHandle)
+      .neq('id', user.id)
+      .maybeSingle();
+
+    if (lookupError) throw lookupError;
+    if (existingProfile) throw new Error('Esse @ ja esta em uso.');
+
+    const updatedUser = {
+      ...user,
+      handle: normalizedHandle,
+      usernameConfigured: true
+    };
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ handle: normalizedHandle, username_configured: true })
+      .eq('id', user.id);
+
+    if (error) throw error;
+
+    setUser(updatedUser);
+    setProfileUsers(prev => prev.map(profile => profile.id === user.id ? updatedUser : profile));
   };
 
   const resendConfirmation = async (email: string) => {
@@ -495,6 +531,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     authError,
     login,
     signUp,
+    updateHandle,
     resendConfirmation,
     requestPasswordReset,
     updatePassword,

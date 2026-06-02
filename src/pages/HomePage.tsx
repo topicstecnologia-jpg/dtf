@@ -24,9 +24,9 @@ export const HomePage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#17171B] text-white pb-32">
+    <div className="flex flex-col min-h-screen bg-[#17171B] text-white pb-24 md:pb-20">
       {/* Stories Section */}
-      <div className="pt-6 px-4 mb-8">
+      <div className="pt-5 md:pt-16 px-4 mb-5 md:mb-4">
         <div className="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide">
           {/* Your Story */}
           <div className="flex flex-col items-center space-y-2 min-w-[72px]">
@@ -47,7 +47,7 @@ export const HomePage: React.FC = () => {
           
           {/* Other Stories */}
           {profileUsers.filter((profile) => profile.id !== user?.id).map((u, index) => (
-            <div key={u.id} className="flex flex-col items-center space-y-2 min-w-[72px] cursor-pointer" onClick={() => navigate(`/profile/${u.id}`)}>
+            <div key={u.id} className="flex flex-col items-center space-y-2 min-w-[72px] cursor-pointer" onClick={() => navigate(`/profile/${u.handle}`)}>
               <div className={`w-[72px] h-[72px] rounded-[24px] p-[2px] ${index % 2 === 0 ? 'bg-gradient-to-tr from-yellow-400 to-orange-500' : 'bg-gradient-to-tr from-green-400 to-blue-500'}`}>
                 <div className="w-full h-full rounded-[22px] bg-[#17171B] p-[2px]">
                   <img 
@@ -64,7 +64,7 @@ export const HomePage: React.FC = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="px-4 mb-8">
+      <div className="px-4 mb-5">
         <div className="flex items-center justify-between space-x-2 overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <style>{`
             .scrollbar-hide::-webkit-scrollbar {
@@ -88,14 +88,14 @@ export const HomePage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="px-4 space-y-6">
+      <div className="px-4 space-y-5">
         {activeTab === 'Community' ? (
           <>
             {/* Featured Card (NestCircle style) */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="w-full aspect-[4/5] rounded-[40px] relative overflow-hidden p-8 flex flex-col justify-between"
+              className="w-full md:max-w-[390px] md:mx-auto aspect-[1080/1450] rounded-[28px] relative overflow-hidden p-6 flex flex-col justify-between"
             >
               {/* Gradient Background */}
               <div className="absolute inset-0 bg-gradient-to-br from-[#FF9A9E] via-[#FECFEF] to-[#A18CD1] opacity-90" />
@@ -104,7 +104,7 @@ export const HomePage: React.FC = () => {
               {/* Content */}
               <div className="relative z-10 flex-1 flex items-center justify-center">
                  {/* Avatar Cluster */}
-                 <div className="relative w-64 h-64">
+                 <div className="relative w-56 h-56">
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-20">
                       <img src={(profileUsers[0] || user)?.avatarUrl} className="w-full h-full object-cover" />
                     </div>
@@ -125,7 +125,7 @@ export const HomePage: React.FC = () => {
 
               <div className="relative z-10 flex items-end justify-between">
                 <div>
-                  <h2 className="text-3xl font-bold text-white mb-1">CineClub</h2>
+                  <h2 className="text-2xl font-bold text-white mb-1">CineClub</h2>
                   <p className="text-white/80 font-medium">Comunidade</p>
                 </div>
                 <button className="px-6 py-3 bg-[#17171B]/80 backdrop-blur-md text-white rounded-full font-semibold text-sm hover:bg-[#17171B] transition-colors shadow-lg">
@@ -135,7 +135,7 @@ export const HomePage: React.FC = () => {
             </motion.div>
 
             {/* Secondary Card */}
-            <div className="w-full aspect-square rounded-[40px] relative overflow-hidden p-8 bg-[#B4F8C8] text-[#17171B]">
+            <div className="w-full md:max-w-[390px] md:mx-auto aspect-[1080/1450] rounded-[28px] relative overflow-hidden p-6 bg-[#B4F8C8] text-[#17171B]">
                <div className="absolute top-0 right-0 w-64 h-64 bg-[#A0E7E5] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                <div className="relative z-10">
                  <h3 className="text-2xl font-bold mb-2">Tendências</h3>
@@ -153,7 +153,7 @@ export const HomePage: React.FC = () => {
           </>
         ) : (
           /* Feed Content */
-          <div className="space-y-6">
+          <div className="space-y-5 md:max-w-[390px] md:mx-auto">
             {posts.map((post) => {
               const postUser = getUserById(post.userId) || user;
               const postMovie = MOVIES.find(m => m.id === post.movieId);
@@ -166,13 +166,13 @@ export const HomePage: React.FC = () => {
                   key={post.id} 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-[#222226] rounded-[32px] overflow-hidden border border-white/5"
+                  className="bg-[#222226] rounded-[24px] overflow-hidden border border-white/5"
                 >
                   {/* Post Header */}
-                  <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center justify-between p-3.5">
                     <div 
                       className="flex items-center space-x-3 cursor-pointer"
-                      onClick={() => navigate(`/profile/${postUser.id}`)}
+                      onClick={() => navigate(`/profile/${postUser.handle}`)}
                     >
                       <img 
                         src={postUser.avatarUrl} 
@@ -181,7 +181,7 @@ export const HomePage: React.FC = () => {
                       />
                       <div>
                         <p className="font-bold text-sm text-white">{postUser.name}</p>
-                        <p className="text-xs text-gray-400">{postUser.emotionalProfile}</p>
+                        <p className="text-xs text-gray-400">{postUser.handle}</p>
                       </div>
                     </div>
                     <button className="text-gray-400 hover:text-white">
@@ -190,21 +190,21 @@ export const HomePage: React.FC = () => {
                   </div>
 
                   {/* Post Image */}
-                  <div className="w-full aspect-[4/5] bg-gray-800 relative">
+                  <div className="w-full aspect-[1080/1450] bg-gray-800 relative">
                     <img 
                       src={postMovie.posterUrl} 
                       alt={postMovie.title} 
                       className="w-full h-full object-cover"
                     />
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 pt-20">
-                      <h3 className="text-white font-bold text-xl">{postMovie.title}</h3>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-5 pt-16">
+                      <h3 className="text-white font-bold text-lg">{postMovie.title}</h3>
                       <p className="text-white/70 text-xs mt-1">{postMovie.year} • {postMovie.genres.join(', ')}</p>
                     </div>
                   </div>
 
                   {/* Post Actions */}
-                  <div className="p-5">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center space-x-5">
                         <button 
                           onClick={() => toggleLikePost(post.id)}
@@ -241,7 +241,7 @@ export const HomePage: React.FC = () => {
 
                     <p className="font-bold text-sm mb-2">{post.likes} curtidas</p>
                     <p className="text-sm text-gray-300 leading-relaxed">
-                      <span className="font-bold text-white mr-2">{postUser.name}</span>
+                      <span className="font-bold text-white mr-2">{postUser.handle}</span>
                       {post.caption}
                     </p>
                     <p className="text-xs text-gray-500 mt-3 uppercase tracking-wide font-medium">

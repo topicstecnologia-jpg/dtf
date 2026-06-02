@@ -6,19 +6,29 @@ const defaultAvatar =
 const defaultCover =
   'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80';
 
-export const createDefaultProfile = (id: string, email?: string, name?: string): User => {
-  const displayName = name?.trim() || email?.split('@')[0] || 'Usuario';
-  const normalizedHandle = displayName
+export const normalizeHandle = (value: string) => {
+  const normalized = value
+    .trim()
+    .replace(/^@+/, '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 24);
+
+  return normalized ? `@${normalized}` : '';
+};
+
+export const createDefaultProfile = (id: string, email?: string, name?: string, handle?: string): User => {
+  const displayName = name?.trim() || email?.split('@')[0] || 'Usuario';
+  const normalizedHandle = normalizeHandle(handle || displayName);
 
   return {
     id,
     name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
-    handle: `@${normalizedHandle || 'usuario'}`,
+    handle: normalizedHandle || '@usuario',
+    usernameConfigured: Boolean(handle),
     avatarUrl: defaultAvatar,
     coverUrl: defaultCover,
     bio: 'Apaixonado por cinema.',
@@ -41,6 +51,7 @@ export const mapProfileRowToUser = (row: any): User => ({
   id: row.id,
   name: row.name || 'Usuario',
   handle: row.handle || '@usuario',
+  usernameConfigured: row.username_configured || false,
   avatarUrl: row.avatar_url || defaultAvatar,
   coverUrl: row.cover_url || defaultCover,
   bio: row.bio || '',
@@ -58,6 +69,7 @@ export const mapUserToProfileRow = (user: User) => ({
   id: user.id,
   name: user.name,
   handle: user.handle,
+  username_configured: user.usernameConfigured || false,
   avatar_url: user.avatarUrl,
   cover_url: user.coverUrl,
   bio: user.bio,
