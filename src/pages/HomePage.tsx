@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type, Search, Camera, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type, Search, Camera, Image as ImageIcon, Trash2, Bell, Repeat2 } from 'lucide-react';
 import { MOVIES } from '../data/mock';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,6 +20,7 @@ export const HomePage: React.FC = () => {
   const [isPublishingScene, setIsPublishingScene] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [profileSearch, setProfileSearch] = useState('');
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
 
   const latestStoriesByUser = stories.reduce<Story[]>((latestStories, story) => {
@@ -39,6 +40,33 @@ export const HomePage: React.FC = () => {
       ))
       .slice(0, 6)
     : [];
+  const ownPosts = posts.filter(post => post.userId === user?.id);
+  const likeNotifications = ownPosts.flatMap(post => (
+    post.likedBy
+      .filter(userId => userId !== user?.id)
+      .map(userId => ({ type: 'like', post, profile: getUserById(userId) }))
+  )).filter(item => item.profile).slice(0, 6);
+  const commentNotifications = ownPosts.flatMap(post => (
+    post.comments
+      .filter(comment => comment.userId !== user?.id)
+      .map(comment => ({ type: 'comment', post, comment, profile: getUserById(comment.userId) }))
+  )).filter(item => item.profile).slice(0, 6);
+  const followerNotifications = profileUsers
+    .filter(profile => profile.id !== user?.id && profile.followingIds?.includes(user?.id || ''))
+    .slice(0, 6)
+    .map(profile => ({ type: 'follow', profile }));
+  const recommendedProfiles = profileUsers
+    .filter(profile => profile.id !== user?.id && !user?.followingIds?.includes(profile.id))
+    .sort((a, b) => Number(b.emotionalProfile === user?.emotionalProfile) - Number(a.emotionalProfile === user?.emotionalProfile))
+    .slice(0, 6)
+    .map(profile => ({ type: 'recommendation', profile }));
+  const notifications = [
+    ...likeNotifications,
+    ...commentNotifications,
+    ...followerNotifications,
+    ...recommendedProfiles
+  ].slice(0, 16);
+  const notificationCount = notifications.length;
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,13 +120,29 @@ export const HomePage: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-[#17171B] text-white pb-24 md:pb-20">
       <div className="pt-5 md:pt-16 px-4 mb-5 md:mb-4">
         <div className="relative mb-5">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input
-            value={profileSearch}
-            onChange={(event) => setProfileSearch(event.target.value)}
-            className="w-full h-12 rounded-full bg-[#222226] border border-white/10 pl-11 pr-4 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-white/25"
-            placeholder="Pesquisar perfis"
-          />
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                value={profileSearch}
+                onChange={(event) => setProfileSearch(event.target.value)}
+                className="w-full h-12 rounded-full bg-[#222226] border border-white/10 pl-11 pr-4 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-white/25"
+                placeholder="Pesquisar perfis"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsNotificationsOpen(prev => !prev)}
+              className="relative w-12 h-12 rounded-full bg-[#222226] border border-white/10 flex items-center justify-center text-white hover:bg-[#2A2A30]"
+            >
+              <Bell size={19} />
+              {notificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 rounded-full bg-[#3F1521] px-1 text-[10px] font-bold flex items-center justify-center">
+                  {notificationCount}
+                </span>
+              )}
+            </button>
+          </div>
 
           {searchTerm && (
             <div className="absolute left-0 right-0 top-14 z-40 rounded-3xl border border-white/10 bg-[#222226] p-2 shadow-2xl">
@@ -133,6 +177,59 @@ export const HomePage: React.FC = () => {
               ) : (
                 <p className="px-4 py-3 text-sm text-zinc-500">Nenhum perfil encontrado.</p>
               )}
+            </div>
+          )}
+
+          {isNotificationsOpen && (
+            <div className="absolute left-0 right-0 top-14 z-40 rounded-3xl border border-white/10 bg-[#222226] p-3 shadow-2xl">
+              <div className="flex items-center justify-between px-2 pb-2">
+                <h3 className="text-sm font-bold text-white">Notificacoes</h3>
+                <button type="button" onClick={() => setIsNotificationsOpen(false)} className="text-zinc-500 hover:text-white">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="max-h-80 overflow-y-auto space-y-1 pr-1">
+                {notifications.length === 0 ? (
+                  <p className="px-3 py-5 text-sm text-zinc-500 text-center">Nada novo por enquanto.</p>
+                ) : notifications.map((notification: any, index) => {
+                  const profile = notification.profile;
+                  const message = notification.type === 'like'
+                    ? 'curtiu sua publicacao'
+                    : notification.type === 'comment'
+                      ? `comentou: ${notification.comment.text}`
+                      : notification.type === 'follow'
+                        ? 'comecou a seguir voce'
+                        : profile.emotionalProfile === user?.emotionalProfile
+                          ? `combina com seu tipo ${user?.emotionalProfile}`
+                          : 'perfil recomendado para voce';
+
+                  return (
+                    <button
+                      key={`${notification.type}-${profile.id}-${notification.post?.id || index}`}
+                      type="button"
+                      onClick={() => {
+                        setIsNotificationsOpen(false);
+                        navigate(`/profile/${profile.handle}`);
+                      }}
+                      className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left hover:bg-white/5 transition-colors"
+                    >
+                      {profile.avatarUrl ? (
+                        <img src={profile.avatarUrl} alt={profile.name} className="w-10 h-10 rounded-full object-cover border border-white/10" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#3F1521] border border-white/10 flex items-center justify-center text-sm font-bold">
+                          {profile.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-white truncate">
+                          <span className="font-bold">{profile.handle}</span>
+                          <span className="text-zinc-400"> {message}</span>
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -331,6 +428,66 @@ export const HomePage: React.FC = () => {
               const isSaved = user?.savedPosts.includes(post.id);
               
               if (!postUser) return null;
+              const hoursAgo = Math.max(0, Math.floor((Date.now() - post.timestamp) / (1000 * 60 * 60)));
+
+              if (post.type === 'text' && !post.thumbnailUrl) {
+                return (
+                  <motion.article
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-[#111113] border border-white/10 px-4 py-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <button type="button" onClick={() => navigate(`/profile/${postUser.handle}`)} className="relative shrink-0">
+                        {postUser.avatarUrl ? (
+                          <img src={postUser.avatarUrl} alt={postUser.name} className="w-11 h-11 rounded-full object-cover border border-white/10" />
+                        ) : (
+                          <div className="w-11 h-11 rounded-full bg-[#3F1521] border border-white/10 flex items-center justify-center text-sm font-bold">
+                            {postUser.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </button>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-3 mb-1">
+                          <button type="button" onClick={() => navigate(`/profile/${postUser.handle}`)} className="min-w-0 text-left">
+                            <span className="font-bold text-white text-sm">{postUser.handle}</span>
+                            <span className="text-zinc-500 text-sm ml-2">{hoursAgo} h</span>
+                          </button>
+                          <button className="text-zinc-500 hover:text-white">
+                            <MoreHorizontal size={18} />
+                          </button>
+                        </div>
+
+                        <p className="text-[15px] leading-relaxed text-zinc-100 whitespace-pre-line">
+                          {post.caption}
+                        </p>
+
+                        <div className="mt-4 flex items-center gap-7 text-zinc-400">
+                          <button
+                            onClick={() => toggleLikePost(post.id)}
+                            className={`flex items-center gap-1.5 text-sm ${post.likedBy.includes(user?.id || '') ? 'text-red-500' : 'hover:text-red-500'}`}
+                          >
+                            <Heart size={20} strokeWidth={1.7} fill={post.likedBy.includes(user?.id || '') ? 'currentColor' : 'none'} />
+                            <span>{post.likes}</span>
+                          </button>
+                          <button onClick={() => setSelectedPost(post)} className="flex items-center gap-1.5 text-sm hover:text-blue-400">
+                            <MessageCircle size={20} strokeWidth={1.7} />
+                            <span>{post.comments.length}</span>
+                          </button>
+                          <button className="hover:text-emerald-400">
+                            <Repeat2 size={20} strokeWidth={1.7} />
+                          </button>
+                          <button className="hover:text-white">
+                            <Share2 size={20} strokeWidth={1.7} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.article>
+                );
+              }
 
               return (
                 <motion.div 
