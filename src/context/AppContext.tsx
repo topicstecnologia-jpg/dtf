@@ -16,6 +16,9 @@ interface AppContextType {
   authError: string;
   login: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name?: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   logout: () => Promise<void>;
   getUserById: (userId?: string) => User | undefined;
   completeOnboarding: (answers: Record<string, string>) => Promise<void>;
@@ -193,13 +196,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await syncSession();
   };
 
+  const getAuthRedirectUrl = (path: string) => {
+    if (typeof window === 'undefined') return undefined;
+    return `${window.location.origin}${path}`;
+  };
+
   const signUp = async (email: string, password: string, name?: string) => {
     if (!supabase) throw new Error('Supabase nao esta configurado.');
     setAuthError('');
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name: name || email.split('@')[0] } }
+      options: {
+        data: { name: name || email.split('@')[0] },
+        emailRedirectTo: getAuthRedirectUrl('/home')
+      }
     });
 
     if (error) {
@@ -219,6 +230,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUser(profile);
       await refreshAppData(data.user.id);
     }
+  };
+
+  const resendConfirmation = async (email: string) => {
+    if (!supabase) throw new Error('Supabase nao esta configurado.');
+    setAuthError('');
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: getAuthRedirectUrl('/home') }
+    });
+
+    if (error) {
+      setAuthError(error.message);
+      throw error;
+    }
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    if (!supabase) throw new Error('Supabase nao esta configurado.');
+    setAuthError('');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: getAuthRedirectUrl('/reset-password')
+    });
+
+    if (error) {
+      setAuthError(error.message);
+      throw error;
+    }
+  };
+
+  const updatePassword = async (password: string) => {
+    if (!supabase) throw new Error('Supabase nao esta configurado.');
+    setAuthError('');
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      setAuthError(error.message);
+      throw error;
+    }
+
+    await syncSession();
   };
 
   const logout = async () => {
@@ -441,6 +493,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     authError,
     login,
     signUp,
+    resendConfirmation,
+    requestPasswordReset,
+    updatePassword,
     logout,
     getUserById,
     completeOnboarding,

@@ -14,6 +14,7 @@ import { MatchesPage } from './pages/MatchesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
 import { HomePage } from './pages/HomePage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { SplashScreen } from './components/SplashScreen';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -42,6 +43,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
           
           <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />

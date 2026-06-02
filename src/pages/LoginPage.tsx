@@ -3,36 +3,77 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../components/Button';
 import { useApp } from '../context/AppContext';
-import { Eye, EyeOff, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, ArrowLeft, Mail } from 'lucide-react';
+
+type AuthMode = 'login' | 'signup' | 'forgot';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, signUp, authError } = useApp();
+  const { login, signUp, resendConfirmation, requestPasswordReset, authError } = useApp();
   const [step, setStep] = useState(1);
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const resetFeedback = () => {
+    setLocalError('');
+    setSuccessMessage('');
+  };
+
+  const changeMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    setStep(1);
+    setPassword('');
+    resetFeedback();
+  };
+
+  const ensureEmail = () => {
+    if (!email.trim()) {
+      setLocalError('Informe seu email primeiro.');
+      return false;
+    }
+    return true;
+  };
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
-    if (step === 1 && email) {
-      setStep(2);
-    } else if (step === 2 && password) {
-      handleAuth();
+    resetFeedback();
+
+    if (!ensureEmail()) return;
+
+    if (mode === 'forgot') {
+      handlePasswordReset();
+      return;
     }
+
+    if (step === 1) {
+      setStep(2);
+      return;
+    }
+
+    if (!password) {
+      setLocalError('Informe sua senha.');
+      return;
+    }
+
+    handleAuth();
   };
 
   const handleBack = () => {
-    if (step === 2) setStep(1);
+    if (step === 2) {
+      setStep(1);
+      resetFeedback();
+    }
   };
 
   const handleAuth = async () => {
     setIsLoading(true);
-    setLocalError('');
+    resetFeedback();
 
     try {
       if (mode === 'signup') {
@@ -42,11 +83,60 @@ export const LoginPage: React.FC = () => {
       }
       navigate('/onboarding');
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : 'Nao foi possivel autenticar.');
+      const message = error instanceof Error ? error.message : 'Nao foi possivel autenticar.';
+      if (message.includes('Confirme seu email')) {
+        setSuccessMessage(message);
+      } else {
+        setLocalError(message);
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleResendConfirmation = async () => {
+    if (!ensureEmail()) return;
+    setIsLoading(true);
+    resetFeedback();
+
+    try {
+      await resendConfirmation(email);
+      setSuccessMessage('Email de confirmacao reenviado. Confira sua caixa de entrada.');
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Nao foi possivel reenviar a confirmacao.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!ensureEmail()) return;
+    setIsLoading(true);
+    resetFeedback();
+
+    try {
+      await requestPasswordReset(email);
+      setSuccessMessage('Enviamos um link para voce redefinir sua senha.');
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : 'Nao foi possivel enviar a recuperacao de senha.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const title = mode === 'signup' ? 'Criar conta' : mode === 'forgot' ? 'Recuperar senha' : 'Bem-vindo';
+  const subtitle = mode === 'signup'
+    ? 'Cadastre-se para entrar'
+    : mode === 'forgot'
+      ? 'Receba um link seguro no seu email'
+      : 'Entre para continuar';
+  const primaryLabel = mode === 'forgot'
+    ? 'Enviar link'
+    : step === 1
+      ? 'Continuar'
+      : mode === 'signup'
+        ? 'Criar conta'
+        : 'Entrar';
 
   return (
     <div className="min-h-screen bg-[#17171B] flex flex-col items-center justify-between p-6 relative overflow-hidden text-white">
@@ -76,13 +166,13 @@ export const LoginPage: React.FC = () => {
             variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
             className="text-4xl font-bold font-display mb-3"
           >
-            {mode === 'signup' ? 'Criar conta' : 'Bem-vindo'}
+            {title}
           </motion.h1>
           <motion.p
             variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
             className="text-gray-400 text-lg"
           >
-            {mode === 'signup' ? 'Cadastre-se para entrar' : 'Entre para continuar'}
+            {subtitle}
           </motion.p>
         </motion.div>
       </div>
@@ -95,9 +185,9 @@ export const LoginPage: React.FC = () => {
       >
         <form onSubmit={handleNext} className="space-y-6">
           <AnimatePresence mode="wait">
-            {step === 1 ? (
+            {step === 1 || mode === 'forgot' ? (
               <motion.div
-                key="step1"
+                key="step-email"
                 initial={{ x: 20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -20, opacity: 0 }}
@@ -131,7 +221,7 @@ export const LoginPage: React.FC = () => {
               </motion.div>
             ) : (
               <motion.div
-                key="step2"
+                key="step-password"
                 initial={{ x: 20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -20, opacity: 0 }}
@@ -163,13 +253,31 @@ export const LoginPage: React.FC = () => {
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                   </div>
+                  {mode === 'login' && (
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => changeMode('forgot')}
+                        className="text-xs text-gray-400 hover:text-white font-medium"
+                      >
+                        Esqueceu a senha?
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {(localError || authError) && (
+          {(localError || authError) && !successMessage && (
             <p className="text-sm text-red-300 text-center">{localError || authError}</p>
+          )}
+
+          {successMessage && (
+            <div className="flex items-start gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+              <Mail size={18} className="mt-0.5 shrink-0" />
+              <p>{successMessage}</p>
+            </div>
           )}
 
           <Button
@@ -182,28 +290,41 @@ export const LoginPage: React.FC = () => {
               <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                <span className="relative z-10">{step === 1 ? 'Continuar' : mode === 'signup' ? 'Criar conta' : 'Entrar'}</span>
-                {step === 1 && <ArrowRight size={20} className="relative z-10" />}
+                <span className="relative z-10">{primaryLabel}</span>
+                {(step === 1 || mode === 'forgot') && <ArrowRight size={20} className="relative z-10" />}
               </>
             )}
           </Button>
         </form>
 
-        <div className="mt-8 text-center">
-          <p className="text-gray-500 text-sm">
-            {mode === 'login' ? 'Nao tem uma conta?' : 'Ja tem uma conta?'}{' '}
-            <button
-              type="button"
-              onClick={() => {
-                setMode(mode === 'login' ? 'signup' : 'login');
-                setStep(1);
-                setLocalError('');
-              }}
-              className="text-white font-bold hover:underline"
-            >
-              {mode === 'login' ? 'Criar conta' : 'Entrar'}
+        {mode === 'signup' && (
+          <button
+            type="button"
+            onClick={handleResendConfirmation}
+            disabled={isLoading || !email}
+            className="mt-4 w-full text-sm text-gray-300 hover:text-white disabled:text-gray-600"
+          >
+            Reenviar confirmacao de email
+          </button>
+        )}
+
+        <div className="mt-8 text-center space-y-3">
+          {mode === 'forgot' ? (
+            <button type="button" onClick={() => changeMode('login')} className="text-white font-bold hover:underline">
+              Voltar para entrar
             </button>
-          </p>
+          ) : (
+            <p className="text-gray-500 text-sm">
+              {mode === 'login' ? 'Nao tem uma conta?' : 'Ja tem uma conta?'}{' '}
+              <button
+                type="button"
+                onClick={() => changeMode(mode === 'login' ? 'signup' : 'login')}
+                className="text-white font-bold hover:underline"
+              >
+                {mode === 'login' ? 'Criar conta' : 'Entrar'}
+              </button>
+            </p>
+          )}
         </div>
       </motion.div>
     </div>
