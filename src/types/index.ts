@@ -44,6 +44,9 @@ export interface Story {
   likes: number;
   likedBy: string[];
   comments: Comment[];
+  views: number;
+  viewedBy: string[];
+  viewedByCurrentUser?: boolean;
   timestamp: number;
   expiresAt?: number;
 }

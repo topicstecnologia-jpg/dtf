@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { MOVIES } from '../data/mock';
-import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2, MoreHorizontal, Star, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Post } from '../types';
 
 export const ProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, posts: allPosts, startChat, matches, getUserById, profileUsers, updateProfile, updateEmail, deleteAccount, toggleFollowUser, recordPostView, updatePost, deletePost } = useApp();
+  const { user: currentUser, posts: allPosts, startChat, matches, getUserById, profileUsers, updateProfile, updateFavoriteMovies, updateEmail, deleteAccount, toggleFollowUser, recordPostView, updatePost, deletePost } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'reposts' | 'favorites'>('images');
   const [copied, setCopied] = useState(false);
@@ -29,6 +29,11 @@ export const ProfilePage: React.FC = () => {
   const [postActionError, setPostActionError] = useState('');
   const [isSavingPost, setIsSavingPost] = useState(false);
   const [socialList, setSocialList] = useState<'following' | 'followers' | null>(null);
+  const [isEditingFavorites, setIsEditingFavorites] = useState(false);
+  const [selectedFavoriteIds, setSelectedFavoriteIds] = useState<string[]>([]);
+  const [favoriteError, setFavoriteError] = useState('');
+  const [isSavingFavorites, setIsSavingFavorites] = useState(false);
+  const [isLoveTypeOpen, setIsLoveTypeOpen] = useState(false);
 
   const decodedParam = userId ? decodeURIComponent(userId) : '';
   const isCurrentUser = !userId || userId === currentUser?.id || decodedParam.toLowerCase() === currentUser?.handle?.toLowerCase();
@@ -60,6 +65,7 @@ export const ProfilePage: React.FC = () => {
   const liveDisplayPost = liveOriginalPost || liveSelectedPost;
   const liveContentUser = liveOriginalPost ? getUserById(liveOriginalPost.userId) : profileUser;
   const favoriteMovies = (profileUser.favoriteMovies || []).map(id => MOVIES.find(m => m.id === id)).filter(Boolean);
+  const topFavoriteMovie = favoriteMovies[0];
   const loveTypeDescriptions: Record<string, string> = {
     'Sonhador Elegante': 'Conexão bonita, profunda e cheia de significado.',
     'Intenso Magnetico': 'Paixão, presença, química e entrega.',
@@ -105,6 +111,34 @@ export const ProfilePage: React.FC = () => {
     await navigator.clipboard?.writeText(profileUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
+  };
+
+  const openFavoriteEditor = () => {
+    setSelectedFavoriteIds(profileUser.favoriteMovies || []);
+    setFavoriteError('');
+    setIsEditingFavorites(true);
+  };
+
+  const toggleFavoriteSelection = (movieId: string) => {
+    setSelectedFavoriteIds(prev => {
+      if (prev.includes(movieId)) return prev.filter(id => id !== movieId);
+      if (prev.length >= 5) return prev;
+      return [...prev, movieId];
+    });
+  };
+
+  const handleSaveFavorites = async () => {
+    setFavoriteError('');
+    setIsSavingFavorites(true);
+
+    try {
+      await updateFavoriteMovies(selectedFavoriteIds);
+      setIsEditingFavorites(false);
+    } catch (error) {
+      setFavoriteError(error instanceof Error ? error.message : 'Não foi possível salvar seus filmes favoritos.');
+    } finally {
+      setIsSavingFavorites(false);
+    }
   };
 
   const openEditProfile = () => {
@@ -319,14 +353,31 @@ export const ProfilePage: React.FC = () => {
           <p className="text-sm leading-relaxed mb-2">
             {profileUser.bio || 'Sem bio disponível.'}
           </p>
+          {topFavoriteMovie && (
+            <p className="mb-3 text-sm text-zinc-300">
+              <span className="text-zinc-500">Filme favorito:</span>{' '}
+              <span className="font-bold text-white">{topFavoriteMovie.title}</span>
+            </p>
+          )}
           {profileUser.emotionalProfile && (
-            <div className="mb-3 rounded-2xl border border-[#3F1521]/40 bg-[#3F1521]/15 px-4 py-3 text-left">
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#E4B5C2]">Tipo de amor</p>
-              <p className="mt-1 text-sm font-bold text-white">{loveTypeLabels[profileUser.emotionalProfile] || profileUser.emotionalProfile}</p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                {loveTypeDescriptions[profileUser.emotionalProfile] || 'Um jeito unico de viver conexoes.'}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsLoveTypeOpen(true)}
+              className="mb-3 w-full rounded-3xl border border-[#E4B5C2]/25 bg-gradient-to-br from-[#3F1521]/45 to-white/[0.03] px-4 py-4 text-left shadow-[0_18px_45px_rgba(63,21,33,0.25)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E4B5C2]">Tipo de amor</p>
+                  <p className="mt-1 text-base font-bold text-white">{loveTypeLabels[profileUser.emotionalProfile] || profileUser.emotionalProfile}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-300 line-clamp-2">
+                    {loveTypeDescriptions[profileUser.emotionalProfile] || 'Um jeito único de viver conexões.'}
+                  </p>
+                </div>
+                <span className="rounded-full bg-white/10 p-2 text-[#E4B5C2]">
+                  <Info size={16} />
+                </span>
+              </div>
+            </button>
           )}
           <div className="flex items-center justify-center space-x-2 text-sm font-medium text-zinc-300">
             <Camera size={15} />
@@ -370,14 +421,29 @@ export const ProfilePage: React.FC = () => {
       <div className="grid grid-cols-3 gap-0.5">
         {activeTab === 'favorites' ? (
           <>
+            {isCurrentUser && (
+              <div className="col-span-3 p-4">
+                <button
+                  type="button"
+                  onClick={openFavoriteEditor}
+                  className="w-full rounded-2xl border border-white/10 bg-[#17171B] px-4 py-3 text-sm font-bold text-white hover:bg-zinc-900 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Star size={17} fill="currentColor" />
+                  Editar ranking de 5 filmes
+                </button>
+              </div>
+            )}
             {favoriteMovies.length > 0 ? (
-              favoriteMovies.map((movie) => (
+              favoriteMovies.map((movie, index) => (
                 <div key={movie?.id} className="aspect-[2/3] bg-zinc-900 relative overflow-hidden">
                   <img
                     src={movie?.posterUrl}
                     alt={movie?.title}
                     className="w-full h-full object-cover"
                   />
+                  <div className="absolute left-2 top-2 h-7 min-w-7 rounded-full bg-black/70 px-2 flex items-center justify-center text-xs font-bold text-white backdrop-blur-sm">
+                    #{index + 1}
+                  </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
                     <span className="text-xs font-bold truncate">{movie?.title}</span>
                     <span className="text-[10px] text-gray-300">{movie?.year}</span>
@@ -641,6 +707,123 @@ export const ProfilePage: React.FC = () => {
                   </button>
                 ))
               )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {isLoveTypeOpen && profileUser.emotionalProfile && (
+        <div className="fixed inset-0 z-[129] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#E4B5C2]">Tipo de amor</p>
+                <h2 className="mt-2 text-2xl font-bold text-white">
+                  {loveTypeLabels[profileUser.emotionalProfile] || profileUser.emotionalProfile}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLoveTypeOpen(false)}
+                className="p-2 rounded-full bg-white/5 text-zinc-300 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="mt-5 text-sm leading-relaxed text-zinc-300">
+              {loveTypeDescriptions[profileUser.emotionalProfile] || 'Um jeito único de viver conexões.'}
+            </p>
+          </motion.div>
+        </div>
+      )}
+
+      {isEditingFavorites && (
+        <div className="fixed inset-0 z-[129] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md max-h-[90vh] overflow-hidden rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] shadow-2xl"
+          >
+            <div className="flex items-center justify-between p-5 border-b border-white/10">
+              <div>
+                <h2 className="text-xl font-bold">Ranking de filmes favoritos</h2>
+                <p className="text-xs text-zinc-500">{selectedFavoriteIds.length}/5 selecionados</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingFavorites(false)}
+                className="p-2 rounded-full bg-white/5 text-zinc-300 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {selectedFavoriteIds.length > 0 && (
+              <div className="border-b border-white/10 p-4">
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Sua ordem</p>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {selectedFavoriteIds.map((movieId, index) => {
+                    const movie = MOVIES.find(item => item.id === movieId);
+                    if (!movie) return null;
+                    return (
+                      <button
+                        key={movie.id}
+                        type="button"
+                        onClick={() => toggleFavoriteSelection(movie.id)}
+                        className="relative h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-900"
+                      >
+                        <img src={movie.posterUrl} alt={movie.title} className="h-full w-full object-cover" />
+                        <span className="absolute left-1 top-1 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">#{index + 1}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="max-h-[48vh] overflow-y-auto p-3">
+              {MOVIES.map(movie => {
+                const selectedIndex = selectedFavoriteIds.indexOf(movie.id);
+                const isSelected = selectedIndex >= 0;
+                const isDisabled = !isSelected && selectedFavoriteIds.length >= 5;
+
+                return (
+                  <button
+                    key={movie.id}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => toggleFavoriteSelection(movie.id)}
+                    className="w-full flex items-center gap-3 rounded-2xl p-3 text-left hover:bg-white/5 disabled:opacity-40"
+                  >
+                    <img src={movie.posterUrl} alt={movie.title} className="h-16 w-11 rounded-lg object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-white">{movie.title}</p>
+                      <p className="text-xs text-zinc-500">{movie.year}</p>
+                    </div>
+                    <span className={`h-8 min-w-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                      isSelected ? 'bg-white text-black' : 'bg-white/5 text-zinc-500'
+                    }`}>
+                      {isSelected ? `#${selectedIndex + 1}` : '+'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-white/10 p-4">
+              {favoriteError && <p className="mb-3 text-sm text-red-300">{favoriteError}</p>}
+              <button
+                type="button"
+                disabled={isSavingFavorites}
+                onClick={handleSaveFavorites}
+                className="w-full h-12 rounded-full bg-[#3F1521] hover:bg-[#5B343C] disabled:opacity-60 text-white font-bold transition-colors"
+              >
+                {isSavingFavorites ? 'Salvando...' : 'Salvar ranking'}
+              </button>
             </div>
           </motion.div>
         </div>

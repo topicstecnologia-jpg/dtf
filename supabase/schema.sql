@@ -112,6 +112,13 @@ create table if not exists public.story_comments (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.story_views (
+  story_id uuid not null references public.stories(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (story_id, user_id)
+);
+
 alter table public.profiles
   add column if not exists username_configured boolean not null default false;
 
@@ -376,6 +383,18 @@ begin
   then
     alter publication supabase_realtime add table public.story_comments;
   end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'story_views'
+    )
+  then
+    alter publication supabase_realtime add table public.story_views;
+  end if;
 end;
 $$;
 
@@ -456,6 +475,7 @@ alter table public.post_likes enable row level security;
 alter table public.post_views enable row level security;
 alter table public.story_likes enable row level security;
 alter table public.story_comments enable row level security;
+alter table public.story_views enable row level security;
 
 drop policy if exists "Profiles are visible to authenticated users" on public.profiles;
 create policy "Profiles are visible to authenticated users"
@@ -630,6 +650,18 @@ create policy "Story comments are visible to authenticated users"
 drop policy if exists "Users can comment stories as themselves" on public.story_comments;
 create policy "Users can comment stories as themselves"
   on public.story_comments for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Story views are visible to authenticated users" on public.story_views;
+create policy "Story views are visible to authenticated users"
+  on public.story_views for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Users can record story views as themselves" on public.story_views;
+create policy "Users can record story views as themselves"
+  on public.story_views for insert
   to authenticated
   with check (auth.uid() = user_id);
 

@@ -25,6 +25,7 @@ interface AppContextType {
   logout: () => Promise<void>;
   updateHandle: (handle: string) => Promise<void>;
   updateProfile: (values: { name: string; handle: string; bio?: string; avatarFile?: File | null }) => Promise<void>;
+  updateFavoriteMovies: (movieIds: string[]) => Promise<void>;
   updateEmail: (email: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
@@ -36,6 +37,7 @@ interface AppContextType {
   deleteStory: (storyId: string) => Promise<void>;
   addStoryComment: (storyId: string, text: string) => Promise<void>;
   toggleLikeStory: (storyId: string) => Promise<void>;
+  recordStoryView: (storyId: string) => Promise<void>;
   recordPostView: (postId: string) => Promise<void>;
   getUserById: (userId?: string) => User | undefined;
   completeOnboarding: (answers: Record<string, string>) => Promise<void>;
@@ -228,6 +230,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       text: comment.text,
       timestamp: new Date(comment.created_at).getTime()
     })),
+    views: row.story_views?.length || 0,
+    viewedBy: (row.story_views || []).map((view: any) => view.user_id),
+    viewedByCurrentUser: Boolean(user?.id && (row.story_views || []).some((view: any) => view.user_id === user.id)),
     timestamp: new Date(row.created_at).getTime(),
     expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : undefined
   });
@@ -297,7 +302,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cutoff = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString();
     const { data, error } = await supabase
       .from('stories')
-      .select('*, story_likes(user_id), story_comments(*)')
+      .select('*, story_likes(user_id), story_comments(*), story_views(user_id)')
       .gt('expires_at', new Date().toISOString())
       .gte('created_at', cutoff)
       .order('created_at', { ascending: false });
@@ -492,6 +497,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? Array.from(new Set([...story.likedBy, userId]))
         : story.likedBy.filter(id => id !== userId);
       return { ...story, likedBy, likes: likedBy.length };
+    }));
+  };
+
+  const applyViewToStory = (storyId: string, userId: string) => {
+    setStories(prevStories => prevStories.map(story => {
+      if (story.id !== storyId || story.viewedBy.includes(userId)) return story;
+      const viewedBy = [...story.viewedBy, userId];
+      return {
+        ...story,
+        viewedBy,
+        views: viewedBy.length,
+        viewedByCurrentUser: user?.id === userId ? true : story.viewedByCurrentUser
+      };
     }));
   };
 
@@ -731,6 +749,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           applyLikeToStory(row.story_id, row.user_id, false);
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'story_views' },
+        (payload) => {
+          const row = payload.new as any;
+          applyViewToStory(row.story_id, row.user_id);
+        }
+      )
       .subscribe();
 
     return () => {
@@ -925,6 +951,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     await logout();
+  };
+
+  const updateFavoriteMovies = async (movieIds: string[]) => {
+    if (!user || !supabase) return;
+    const favoriteMovies = movieIds.slice(0, 5);
+    const updatedUser = { ...user, favoriteMovies };
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ favorite_movies: favoriteMovies })
+      .eq('id', user.id);
+
+    if (error) throw new Error(error.message);
+
+    setUser(updatedUser);
+    setProfileUsers(prev => prev.map(profile => profile.id === user.id ? updatedUser : profile));
   };
 
   const resendConfirmation = async (email: string) => {
@@ -1273,6 +1315,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     applyLikeToStory(storyId, user.id, !isLiked);
   };
 
+  const recordStoryView = async (storyId: string) => {
+    if (!user || !supabase) return;
+    const story = stories.find(item => item.id === storyId);
+    if (!story || story.userId === user.id || story.viewedBy.includes(user.id)) return;
+
+    const { error } = await supabase
+      .from('story_views')
+      .upsert({ story_id: storyId, user_id: user.id }, { onConflict: 'story_id,user_id', ignoreDuplicates: true });
+
+    if (error) return;
+    applyViewToStory(storyId, user.id);
+  };
+
   const recordPostView = async (postId: string) => {
     if (!user || !supabase) return;
     const post = posts.find(item => item.id === postId);
@@ -1524,6 +1579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logout,
     getUserById,
     updateProfile,
+    updateFavoriteMovies,
     updateEmail,
     deleteAccount,
     toggleFollowUser,
@@ -1535,6 +1591,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteStory,
     addStoryComment,
     toggleLikeStory,
+    recordStoryView,
     recordPostView,
     completeOnboarding,
     swipeMovie,

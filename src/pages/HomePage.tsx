@@ -8,7 +8,7 @@ import { Post, Story } from '../types';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, posts, stories, matches, sendMessage, addComment, startChat, toggleLikeStory, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory } = useApp();
+  const { user, posts, stories, matches, sendMessage, addComment, startChat, toggleLikeStory, recordStoryView, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory } = useApp();
   const [activeTab, setActiveTab] = useState('Community');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
@@ -20,6 +20,7 @@ export const HomePage: React.FC = () => {
   const [isPublishingScene, setIsPublishingScene] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [storyCommentText, setStoryCommentText] = useState('');
+  const [isStoryViewersOpen, setIsStoryViewersOpen] = useState(false);
   const [profileSearch, setProfileSearch] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState<'all' | 'likes' | 'comments' | 'follows' | 'profiles'>('all');
@@ -129,7 +130,11 @@ export const HomePage: React.FC = () => {
   const openStory = (story: Story) => {
     setSelectedStory(story);
     setStoryCommentText('');
+    setIsStoryViewersOpen(false);
     setSceneError('');
+    if (story.userId !== user?.id) {
+      recordStoryView(story.id);
+    }
   };
 
   const goToNextStory = () => {
@@ -1074,12 +1079,91 @@ export const HomePage: React.FC = () => {
                       </form>
                       <div className="mt-2 flex items-center gap-4 pl-2 text-xs text-white/75">
                         <span>{liveSelectedStory.likes} curtidas</span>
-                        <span>respostas vao para o chat</span>
+                        {liveSelectedStory.userId === user?.id && (
+                          <button
+                            type="button"
+                            onClick={() => setIsStoryViewersOpen(true)}
+                            className="font-semibold text-white underline-offset-4 hover:underline"
+                          >
+                            {liveSelectedStory.views} visualizações
+                          </button>
+                        )}
+                        <span>respostas vão para o chat</span>
                       </div>
                     </div>
                   </>
                 );
               })()}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {liveSelectedStory && isStoryViewersOpen && (
+          <div className="fixed inset-0 z-[130] flex items-end md:items-center justify-center p-0 md:p-5">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsStoryViewersOpen(false)}
+              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 40, opacity: 0 }}
+              className="relative w-full max-w-md max-h-[72vh] overflow-hidden rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 p-5">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Visualizações</h2>
+                  <p className="text-xs text-zinc-500">{liveSelectedStory.views} pessoas viram sua Cena</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsStoryViewersOpen(false)}
+                  className="rounded-full bg-white/5 p-2 text-zinc-300 hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="max-h-[56vh] overflow-y-auto p-3">
+                {liveSelectedStory.viewedBy.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-zinc-500">Ninguém viu sua Cena ainda.</p>
+                ) : (
+                  liveSelectedStory.viewedBy.map(viewerId => {
+                    const viewer = getUserById(viewerId);
+                    if (!viewer) return null;
+
+                    return (
+                      <button
+                        key={viewer.id}
+                        type="button"
+                        onClick={() => {
+                          setIsStoryViewersOpen(false);
+                          setSelectedStory(null);
+                          navigate(`/profile/${viewer.handle}`);
+                        }}
+                        className="w-full flex items-center gap-3 rounded-2xl p-3 text-left hover:bg-white/5"
+                      >
+                        {viewer.avatarUrl ? (
+                          <img src={viewer.avatarUrl} alt={viewer.name} className="h-12 w-12 rounded-full object-cover" />
+                        ) : (
+                          <div className="h-12 w-12 rounded-full bg-[#3F1521] flex items-center justify-center font-bold">
+                            {viewer.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-white">{viewer.name}</p>
+                          <p className="truncate text-xs text-zinc-500">{viewer.handle}</p>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </motion.div>
           </div>
         )}
