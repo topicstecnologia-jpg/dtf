@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation();
-  const { user, updateHandle, createPost } = useApp();
+  const { user, unreadMessageCount, updateHandle, createPost } = useApp();
   const [handleInput, setHandleInput] = useState(user?.handle?.replace(/^@/, '') || '');
   const [handleError, setHandleError] = useState('');
   const [isSavingHandle, setIsSavingHandle] = useState(false);
@@ -136,6 +136,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                     className={isActive ? 'text-white' : 'text-gray-500'}
                   />
                 </span>
+                {item.path === '/matches' && unreadMessageCount > 0 && (
+                  <span className="absolute -right-1 -top-1 z-20 min-w-5 h-5 rounded-full bg-red-500 px-1 text-[10px] font-bold text-white flex items-center justify-center">
+                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                  </span>
+                )}
               </MotionLink>
             );
           })}

@@ -12,6 +12,8 @@ interface AppContextType {
   chats: Chat[];
   posts: Post[];
   stories: Story[];
+  onlineUserIds: string[];
+  unreadMessageCount: number;
   currentMovieIndex: number;
   isLoading: boolean;
   authError: string;
@@ -45,6 +47,9 @@ interface AppContextType {
   addComment: (postId: string, text: string) => Promise<void>;
   toggleSavePost: (postId: string) => Promise<void>;
   toggleLikePost: (postId: string) => Promise<void>;
+  markChatRead: (matchId: string) => void;
+  getUnreadMessagesForMatch: (matchId: string) => number;
+  isUserOnline: (userId?: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -57,6 +62,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [chats, setChats] = useState<Chat[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
+  const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  const [readMessagesByMatch, setReadMessagesByMatch] = useState<Record<string, number>>({});
   const [currentMovieIndex, setCurrentMovieIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState('');
@@ -65,6 +72,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!userId) return undefined;
     if (user?.id === userId) return user;
     return profileUsers.find(profile => profile.id === userId);
+  };
+
+  const getReadMessagesStorageKey = (userId: string) => `dtf:read-messages:${userId}`;
+
+  const isUserOnline = (userId?: string) => Boolean(userId && onlineUserIds.includes(userId));
+
+  const markChatRead = (matchId: string) => {
+    if (!user) return;
+    const chat = chats.find(item => item.matchId === matchId);
+    const lastMessageAt = chat?.messages[chat.messages.length - 1]?.timestamp || Date.now();
+
+    setReadMessagesByMatch(prev => {
+      const next = { ...prev, [matchId]: Math.max(prev[matchId] || 0, lastMessageAt) };
+      localStorage.setItem(getReadMessagesStorageKey(user.id), JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const unreadMessageCount = useMemo(() => {
+    if (!user) return 0;
+    return chats.reduce((count, chat) => {
+      const lastReadAt = readMessagesByMatch[chat.matchId] || 0;
+      return count + chat.messages.filter(message => (
+        message.senderId !== user.id && message.timestamp > lastReadAt
+      )).length;
+    }, 0);
+  }, [chats, readMessagesByMatch, user?.id]);
+
+  const getUnreadMessagesForMatch = (matchId: string) => {
+    if (!user) return 0;
+    const chat = chats.find(item => item.matchId === matchId);
+    const lastReadAt = readMessagesByMatch[matchId] || 0;
+    return chat?.messages.filter(message => (
+      message.senderId !== user.id && message.timestamp > lastReadAt
+    )).length || 0;
   };
 
   const attachPostToProfile = (post: Post) => {
@@ -312,6 +354,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setReadMessagesByMatch({});
+      setOnlineUserIds([]);
+      return;
+    }
+
+    try {
+      const stored = localStorage.getItem(getReadMessagesStorageKey(user.id));
+      setReadMessagesByMatch(stored ? JSON.parse(stored) : {});
+    } catch {
+      setReadMessagesByMatch({});
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!supabase || !user) return;
+
+    const realtimeClient = supabase;
+    const presenceChannel = realtimeClient.channel('online-users', {
+      config: { presence: { key: user.id } }
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const presenceState = presenceChannel.presenceState();
+        setOnlineUserIds(Object.keys(presenceState));
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            user_id: user.id,
+            online_at: new Date().toISOString()
+          });
+        }
+      });
+
+    return () => {
+      realtimeClient.removeChannel(presenceChannel);
+    };
+  }, [user?.id]);
 
   const appendMessageToChat = (matchId: string, message: Message) => {
     setChats(prevChats => {
@@ -1349,6 +1433,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     chats,
     posts,
     stories,
+    onlineUserIds,
+    unreadMessageCount,
     currentMovieIndex,
     isLoading,
     authError,
@@ -1381,8 +1467,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     startChat,
     addComment,
     toggleSavePost,
-    toggleLikePost
-  }), [user, profileUsers, movies, matches, chats, posts, stories, currentMovieIndex, isLoading, authError]);
+    toggleLikePost,
+    markChatRead,
+    getUnreadMessagesForMatch,
+    isUserOnline
+  }), [user, profileUsers, movies, matches, chats, posts, stories, onlineUserIds, unreadMessageCount, currentMovieIndex, isLoading, authError, readMessagesByMatch]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

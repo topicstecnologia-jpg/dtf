@@ -30,7 +30,7 @@ type SharedPostPayload = {
 export const ChatPage: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
-  const { user, chats, sendMessage, sendMediaMessage, matches, posts, getUserById } = useApp();
+  const { user, chats, sendMessage, sendMediaMessage, matches, posts, getUserById, markChatRead, isUserOnline } = useApp();
   const [inputText, setInputText] = useState('');
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -46,6 +46,7 @@ export const ChatPage: React.FC = () => {
   const otherUser = getUserById(otherUserId);
   const chat = chats.find(c => c.matchId === matchId);
   const messages = chat?.messages || [];
+  const otherUserOnline = isUserOnline(otherUserId);
 
   const getSharedPostFromText = (text?: string): SharedPostPayload | null => {
     if (!text) return null;
@@ -91,6 +92,7 @@ export const ChatPage: React.FC = () => {
 
   useEffect(() => {
     scrollToBottom();
+    if (matchId) markChatRead(matchId);
   }, [messages.length]);
 
   useEffect(() => {
@@ -211,7 +213,9 @@ export const ChatPage: React.FC = () => {
               alt={otherUser.name}
               className="w-11 h-11 rounded-full object-cover border border-white/10"
             />
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#17171B]" />
+            {otherUserOnline && (
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#17171B]" />
+            )}
           </button>
           <button
             type="button"
@@ -219,7 +223,7 @@ export const ChatPage: React.FC = () => {
             className="text-left min-w-0"
           >
             <h2 className="font-bold text-white text-base leading-tight truncate">{otherUser.name}</h2>
-            <p className="text-xs text-gray-400 font-medium truncate">{otherUser.handle}</p>
+            <p className="text-xs text-gray-400 font-medium truncate">{otherUserOnline ? 'online' : otherUser.handle}</p>
           </button>
         </div>
         <div className="flex items-center space-x-3 text-gray-400 shrink-0">

@@ -23,6 +23,7 @@ export const HomePage: React.FC = () => {
   const [profileSearch, setProfileSearch] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState<'all' | 'likes' | 'comments' | 'follows' | 'profiles'>('all');
+  const [readNotificationKeys, setReadNotificationKeys] = useState<string[]>([]);
   const [postToSend, setPostToSend] = useState<Post | null>(null);
   const [postActionMessage, setPostActionMessage] = useState('');
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
@@ -79,7 +80,6 @@ export const HomePage: React.FC = () => {
     if (notificationFilter === 'follows') return notification.type === 'follow';
     return notification.type === 'recommendation';
   });
-  const notificationCount = notifications.length;
   const notificationTabs = [
     { id: 'all', label: 'Tudo' },
     { id: 'likes', label: 'Curtidas' },
@@ -87,6 +87,36 @@ export const HomePage: React.FC = () => {
     { id: 'follows', label: 'Novos seguidores' },
     { id: 'profiles', label: 'Perfis' }
   ] as const;
+
+  const getNotificationKey = (notification: any, index: number) => (
+    `${notification.type}:${notification.profile?.id || 'profile'}:${notification.post?.id || notification.comment?.id || index}`
+  );
+  const notificationKeys = notifications.map(getNotificationKey);
+  const notificationCount = notificationKeys.filter(key => !readNotificationKeys.includes(key)).length;
+
+  useEffect(() => {
+    if (!user?.id) {
+      setReadNotificationKeys([]);
+      return;
+    }
+
+    try {
+      const stored = localStorage.getItem(`dtf:read-notifications:${user.id}`);
+      setReadNotificationKeys(stored ? JSON.parse(stored) : []);
+    } catch {
+      setReadNotificationKeys([]);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !isNotificationsOpen || notificationKeys.length === 0) return;
+
+    setReadNotificationKeys(prev => {
+      const next = Array.from(new Set([...prev, ...notificationKeys]));
+      localStorage.setItem(`dtf:read-notifications:${user.id}`, JSON.stringify(next));
+      return next;
+    });
+  }, [isNotificationsOpen, user?.id, notificationKeys.join('|')]);
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
