@@ -761,9 +761,9 @@ export const ProfilePage: React.FC = () => {
           <motion.div
             initial={{ y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="w-full max-w-md max-h-[90vh] overflow-hidden rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] shadow-2xl"
+            className="w-full max-w-md h-[88dvh] md:h-auto md:max-h-[90vh] overflow-hidden rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] shadow-2xl flex flex-col"
           >
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
+            <div className="shrink-0 flex items-center justify-between p-5 border-b border-white/10">
               <div>
                 <h2 className="text-xl font-bold">Ranking de filmes favoritos</h2>
                 <p className="text-xs text-zinc-500">{selectedFavoriteIds.length}/5 selecionados</p>
@@ -778,7 +778,7 @@ export const ProfilePage: React.FC = () => {
             </div>
 
             {selectedFavoriteIds.length > 0 && (
-              <div className="border-b border-white/10 p-4">
+              <div className="shrink-0 border-b border-white/10 p-4">
                 <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">Sua ordem</p>
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {selectedFavoriteIds.map((movieId, index) => {
@@ -800,7 +800,7 @@ export const ProfilePage: React.FC = () => {
               </div>
             )}
 
-            <div className="border-b border-white/10 p-4">
+            <div className="shrink-0 border-b border-white/10 p-4">
               <div className="relative">
                 <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input
@@ -812,7 +812,7 @@ export const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            <div className="max-h-[48vh] overflow-y-auto p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 overscroll-contain">
               {filteredFavoriteOptions.length === 0 ? (
                 <p className="py-10 text-center text-sm text-zinc-500">Nenhum filme encontrado.</p>
               ) : filteredFavoriteOptions.map(movie => {
@@ -843,7 +843,7 @@ export const ProfilePage: React.FC = () => {
               })}
             </div>
 
-            <div className="border-t border-white/10 p-4">
+            <div className="shrink-0 border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-[#17171B]">
               {favoriteError && <p className="mb-3 text-sm text-red-300">{favoriteError}</p>}
               <button
                 type="button"
