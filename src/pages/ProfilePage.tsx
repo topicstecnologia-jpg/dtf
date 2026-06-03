@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { MOVIES } from '../data/mock';
-import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2, MoreHorizontal, Star, Info, Search } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2, MoreHorizontal, Star, Info, Search, Menu, LogOut, Bookmark, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Post } from '../types';
 
 export const ProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { user: currentUser, posts: allPosts, startChat, matches, getUserById, profileUsers, updateProfile, updateFavoriteMovies, updateEmail, deleteAccount, toggleFollowUser, recordPostView, updatePost, deletePost } = useApp();
+  const { user: currentUser, posts: allPosts, startChat, matches, getUserById, profileUsers, updateProfile, updateFavoriteMovies, updateEmail, deleteAccount, toggleFollowUser, recordPostView, updatePost, deletePost, logout } = useApp();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'images' | 'reposts' | 'favorites'>('images');
   const [copied, setCopied] = useState(false);
@@ -36,6 +36,8 @@ export const ProfilePage: React.FC = () => {
   const [isLoveTypeOpen, setIsLoveTypeOpen] = useState(false);
   const [favoriteSearch, setFavoriteSearch] = useState('');
   const [selectedMovieInfo, setSelectedMovieInfo] = useState<typeof MOVIES[number] | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsView, setSettingsView] = useState<'menu' | 'saved' | 'liked' | 'help'>('menu');
 
   const decodedParam = userId ? decodeURIComponent(userId) : '';
   const isCurrentUser = !userId || userId === currentUser?.id || decodedParam.toLowerCase() === currentUser?.handle?.toLowerCase();
@@ -101,6 +103,33 @@ export const ProfilePage: React.FC = () => {
     return false;
   });
   const socialProfiles = socialList === 'following' ? followingProfiles : followerProfiles;
+  const savedPosts = currentUser ? allPosts.filter(post => currentUser.savedPosts.includes(post.id)) : [];
+  const likedPosts = currentUser ? allPosts.filter(post => post.likedBy.includes(currentUser.id)) : [];
+  const settingsPosts = settingsView === 'saved' ? savedPosts : likedPosts;
+  const settingsTitle = settingsView === 'saved'
+    ? 'Posts salvos'
+    : settingsView === 'liked'
+      ? 'Posts curtidos'
+      : settingsView === 'help'
+        ? 'Ajuda'
+        : 'Configurações';
+
+  const openSettings = () => {
+    setSettingsView('menu');
+    setIsSettingsOpen(true);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setIsSettingsOpen(false);
+    navigate('/');
+  };
+
+  const openSettingsPost = (post: Post) => {
+    setIsSettingsOpen(false);
+    setSettingsView('menu');
+    navigate(`/post/${post.id}`);
+  };
 
   useEffect(() => {
     if (!currentUser || isCurrentUser) return;
@@ -263,6 +292,11 @@ export const ProfilePage: React.FC = () => {
         <div className="font-bold text-base">{profileUser.handle}</div>
         <div className="flex space-x-4">
           <Bell size={22} />
+          {isCurrentUser && (
+            <button onClick={openSettings} className="relative" aria-label="Abrir configurações">
+              <Menu size={23} />
+            </button>
+          )}
           <button onClick={handleShare} className="relative">
             <Share2 size={22} />
             {copied && (
@@ -897,6 +931,180 @@ export const ProfilePage: React.FC = () => {
                 </div>
               )}
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {isSettingsOpen && isCurrentUser && (
+        <div className="fixed inset-0 z-[131] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md max-h-[88vh] overflow-hidden rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] shadow-2xl flex flex-col"
+          >
+            <div className="shrink-0 flex items-center justify-between p-5 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                {settingsView !== 'menu' && (
+                  <button
+                    type="button"
+                    onClick={() => setSettingsView('menu')}
+                    className="p-2 -ml-2 rounded-full bg-white/5 text-zinc-300 hover:text-white"
+                    aria-label="Voltar"
+                  >
+                    <ArrowLeft size={19} />
+                  </button>
+                )}
+                <div>
+                  <h2 className="text-xl font-bold">{settingsTitle}</h2>
+                  <p className="text-xs text-zinc-500">{profileUser.handle}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(false)}
+                className="p-2 rounded-full bg-white/5 text-zinc-300 hover:text-white"
+                aria-label="Fechar configurações"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {settingsView === 'menu' && (
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setSettingsView('saved')}
+                    className="w-full flex items-center justify-between rounded-2xl bg-white/[0.03] p-4 text-left hover:bg-white/[0.06] transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="rounded-full bg-white/5 p-2 text-zinc-200">
+                        <Bookmark size={18} />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-bold text-white">Posts salvos</span>
+                        <span className="block text-xs text-zinc-500">{savedPosts.length} salvos</span>
+                      </span>
+                    </span>
+                    <ChevronDown size={18} className="-rotate-90 text-zinc-500" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSettingsView('liked')}
+                    className="w-full flex items-center justify-between rounded-2xl bg-white/[0.03] p-4 text-left hover:bg-white/[0.06] transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="rounded-full bg-white/5 p-2 text-zinc-200">
+                        <Heart size={18} />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-bold text-white">Posts curtidos</span>
+                        <span className="block text-xs text-zinc-500">{likedPosts.length} curtidos</span>
+                      </span>
+                    </span>
+                    <ChevronDown size={18} className="-rotate-90 text-zinc-500" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSettingsView('help')}
+                    className="w-full flex items-center justify-between rounded-2xl bg-white/[0.03] p-4 text-left hover:bg-white/[0.06] transition-colors"
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="rounded-full bg-white/5 p-2 text-zinc-200">
+                        <HelpCircle size={18} />
+                      </span>
+                      <span>
+                        <span className="block text-sm font-bold text-white">Ajuda</span>
+                        <span className="block text-xs text-zinc-500">FAQ da plataforma</span>
+                      </span>
+                    </span>
+                    <ChevronDown size={18} className="-rotate-90 text-zinc-500" />
+                  </button>
+                </div>
+
+                <div className="mt-5 border-t border-white/10 pt-4">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-center gap-2 rounded-full border border-red-500/25 px-4 py-3 text-sm font-bold text-red-300 hover:bg-red-500/10 transition-colors"
+                  >
+                    <LogOut size={18} />
+                    Sair da conta
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(settingsView === 'saved' || settingsView === 'liked') && (
+              <div className="flex-1 overflow-y-auto p-4">
+                {settingsPosts.length === 0 ? (
+                  <div className="py-16 text-center text-zinc-500">
+                    {settingsView === 'saved' ? (
+                      <Bookmark size={42} className="mx-auto mb-4 opacity-20" />
+                    ) : (
+                      <Heart size={42} className="mx-auto mb-4 opacity-20" />
+                    )}
+                    <p className="text-sm">
+                      {settingsView === 'saved' ? 'Nenhum post salvo ainda.' : 'Nenhum post curtido ainda.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {settingsPosts.map(post => {
+                      const originalPost = post.repostOfId ? allPosts.find(item => item.id === post.repostOfId) : null;
+                      const displayPost = originalPost || post;
+                      const postUser = getUserById(displayPost.userId);
+                      const movie = displayPost.movieId ? MOVIES.find(item => item.id === displayPost.movieId) : null;
+                      const displayImage = displayPost.thumbnailUrl || movie?.posterUrl;
+
+                      return (
+                        <button
+                          key={post.id}
+                          type="button"
+                          onClick={() => openSettingsPost(post)}
+                          className="overflow-hidden rounded-2xl border border-white/10 bg-[#222226] text-left"
+                        >
+                          <div className="aspect-[1080/1450] bg-zinc-900">
+                            {displayImage ? (
+                              <img src={displayImage} alt="Post" className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="h-full w-full p-4 flex items-center justify-center text-center">
+                                <p className="line-clamp-6 text-sm font-bold leading-snug text-white">{displayPost.caption}</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-3">
+                            <p className="truncate text-xs font-bold text-white">{postUser?.handle || '@usuario'}</p>
+                            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                              {displayPost.caption || 'Sem legenda.'}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {settingsView === 'help' && (
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {[
+                  ['Como o DTF recomenda perfis?', 'A plataforma usa seu tipo de amor, filmes favoritos, curtidas e interações para sugerir perfis com maior compatibilidade.'],
+                  ['Como salvo uma postagem?', 'Toque no ícone de salvar em uma postagem. Ela aparecerá aqui em Posts salvos.'],
+                  ['Como vejo quem me segue?', 'No seu perfil, toque em Seguidores ou Seguindo para abrir a lista real de usuários.'],
+                  ['Como altero meus dados?', 'Use Editar perfil para trocar foto, nome, @, bio e solicitar alteração de email.'],
+                  ['Como saio da conta?', 'Abra este menu de configurações e toque em Sair da conta. Fora isso, sua sessão permanece conectada mesmo fechando o app.']
+                ].map(([question, answer]) => (
+                  <div key={question} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <h3 className="text-sm font-bold text-white">{question}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">{answer}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </motion.div>
         </div>
       )}
