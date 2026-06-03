@@ -220,6 +220,447 @@ export const MOVIES: Movie[] = [
     platforms: ['Netflix', 'Telecine', 'Universal+', 'Lionsgate+', 'Apple TV'],
     rating: 6.5,
     moods: ['leve', 'romântico', 'esperançoso']
+  },
+  {
+    "id": "21",
+    "title": "Simplesmente Acontece",
+    "year": 2014,
+    "genres": [
+      "Comédia Romântica",
+      "Romance"
+    ],
+    "description": "Rosie e Alex são melhores amigos desde a infância, mas a vida, a distância e escolhas erradas impedem que eles assumam o que realmente sentem um pelo outro.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/c/c2/Love%2C_Rosie_poster.jpg",
+    "platforms": [
+      "Netflix",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 7.1,
+    "moods": [
+      "fofo",
+      "nostálgico",
+      "romântico"
+    ]
+  },
+  {
+    "id": "22",
+    "title": "Para Sempre",
+    "year": 2012,
+    "genres": [
+      "Drama",
+      "Romance"
+    ],
+    "description": "Após um acidente, Paige perde a memória recente e não se lembra do marido. Agora, Leo precisa reconquistar o amor da mulher que já havia escolhido ficar ao seu lado.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/9/9f/The_Vow_Poster.jpg",
+    "platforms": [
+      "Prime Video",
+      "Universal+",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.8,
+    "moods": [
+      "emocionante",
+      "leal",
+      "romântico"
+    ]
+  },
+  {
+    "id": "23",
+    "title": "O Melhor de Mim",
+    "year": 2014,
+    "genres": [
+      "Drama",
+      "Romance"
+    ],
+    "description": "Dois antigos namorados se reencontram anos depois em sua cidade natal e percebem que o sentimento do passado ainda está vivo, apesar das marcas que a vida deixou.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/a/a8/The_Best_of_Me_poster.jpg",
+    "platforms": [
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.7,
+    "moods": [
+      "nostálgico",
+      "doloroso",
+      "romântico"
+    ]
+  },
+  {
+    "id": "24",
+    "title": "Idas e Vindas do Amor",
+    "year": 2010,
+    "genres": [
+      "Comédia Romântica",
+      "Romance"
+    ],
+    "description": "Várias histórias de amor, encontros, términos e reconciliações se cruzam em Los Angeles durante o Dia dos Namorados.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/0/0b/Valentines_day_poster_10.jpg",
+    "platforms": [
+      "Netflix",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 5.7,
+    "moods": [
+      "leve",
+      "divertido",
+      "romântico"
+    ]
+  },
+  {
+    "id": "25",
+    "title": "P.S. Eu Te Amo",
+    "year": 2007,
+    "genres": [
+      "Drama",
+      "Romance"
+    ],
+    "description": "Após perder o marido, Holly descobre uma série de cartas deixadas por ele para ajudá-la a enfrentar o luto e redescobrir a vontade de viver.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/6/66/P.S._I_Love_You_%282007_film%29_poster.jpg",
+    "platforms": [
+      "Netflix",
+      "Globoplay",
+      "Telecine",
+      "Universal+",
+      "Lionsgate+",
+      "Apple TV"
+    ],
+    "rating": 7,
+    "moods": [
+      "emocionante",
+      "nostálgico",
+      "romântico"
+    ]
+  },
+  {
+    "id": "26",
+    "title": "Amor e Outras Drogas",
+    "year": 2010,
+    "genres": [
+      "Drama",
+      "Comédia Romântica",
+      "Romance"
+    ],
+    "description": "Um vendedor farmacêutico sedutor conhece uma artista independente com Parkinson precoce, e os dois vivem uma relação intensa que começa sem compromisso e se transforma em amor.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/6/6d/Love_%26_Other_Drugs_Poster.jpg",
+    "platforms": [
+      "Disney+",
+      "Telecine"
+    ],
+    "rating": 6.7,
+    "moods": [
+      "intenso",
+      "sensível",
+      "romântico"
+    ]
+  },
+  {
+    "id": "27",
+    "title": "Antes do Amanhecer",
+    "year": 1995,
+    "genres": [
+      "Drama",
+      "Romance"
+    ],
+    "description": "Jesse e Céline se conhecem em um trem na Europa e decidem passar uma noite juntos em Viena, criando uma conexão profunda em poucas horas.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/d/da/Before_Sunrise_poster.jpg",
+    "platforms": [
+      "Telecine",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 8.1,
+    "moods": [
+      "íntimo",
+      "profundo",
+      "romântico"
+    ]
+  },
+  {
+    "id": "28",
+    "title": "Antes do Anoitecer",
+    "year": 2004,
+    "genres": [
+      "Drama",
+      "Romance"
+    ],
+    "description": "Anos depois do primeiro encontro, Jesse e Céline se reencontram em Paris e precisam lidar com tudo o que ficou mal resolvido entre eles.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/6/6c/Before_Sunset_poster.jpg",
+    "platforms": [
+      "Telecine",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 8.1,
+    "moods": [
+      "maduro",
+      "conversativo",
+      "romântico"
+    ]
+  },
+  {
+    "id": "29",
+    "title": "Um Lugar Chamado Notting Hill",
+    "year": 1999,
+    "genres": [
+      "Comédia Romântica",
+      "Romance"
+    ],
+    "description": "Um simples dono de livraria tem sua vida transformada ao se envolver com uma famosa estrela de cinema, vivendo um romance improvável e cheio de desafios.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/3/38/NottingHillRobertsGrant.jpg",
+    "platforms": [
+      "Prime Video",
+      "Globoplay",
+      "Telecine",
+      "Netflix",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 7.2,
+    "moods": [
+      "clássico",
+      "leve",
+      "romântico"
+    ]
+  },
+  {
+    "id": "30",
+    "title": "Como Perder um Homem em 10 Dias",
+    "year": 2003,
+    "genres": [
+      "Comédia Romântica",
+      "Romance"
+    ],
+    "description": "Uma jornalista tenta afastar um homem em dez dias para escrever uma matéria, enquanto ele aposta que consegue fazer qualquer mulher se apaixonar por ele no mesmo período.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/0/07/HowToLoseAGuy.jpg",
+    "platforms": [
+      "Paramount+",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.5,
+    "moods": [
+      "divertido",
+      "leve",
+      "romântico"
+    ]
+  },
+  {
+    "id": "31",
+    "title": "De Repente 30",
+    "year": 2004,
+    "genres": [
+      "Comédia Romântica",
+      "Fantasia"
+    ],
+    "description": "Jenna, uma garota de 13 anos, acorda magicamente com 30 e precisa entender quem se tornou, enquanto reencontra um antigo amigo que sempre esteve ao seu lado.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/1/1f/13_Going_on_30_film_poster.jpg",
+    "platforms": [
+      "Netflix",
+      "HBO Max/Max",
+      "Claro TV+",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.3,
+    "moods": [
+      "divertido",
+      "nostálgico",
+      "leve"
+    ]
+  },
+  {
+    "id": "32",
+    "title": "Ela",
+    "year": 2013,
+    "genres": [
+      "Drama",
+      "Romance",
+      "Ficção Científica"
+    ],
+    "description": "Um homem solitário desenvolve uma relação emocional com um sistema operacional de inteligência artificial, questionando os limites do amor e da conexão humana.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/4/44/Her2013Poster.jpg",
+    "platforms": [
+      "HBO Max/Max",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 8,
+    "moods": [
+      "melancólico",
+      "reflexivo",
+      "romântico"
+    ]
+  },
+  {
+    "id": "33",
+    "title": "Esposa de Mentirinha",
+    "year": 2011,
+    "genres": [
+      "Comédia Romântica"
+    ],
+    "description": "Um cirurgião plástico inventa que está se divorciando para conquistar uma mulher, mas a mentira cresce quando sua assistente precisa fingir ser sua ex-esposa.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/8/85/Just_Go_with_It_Poster.jpg",
+    "platforms": [
+      "Netflix",
+      "Prime Video",
+      "HBO Max/Max",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.4,
+    "moods": [
+      "leve",
+      "divertido",
+      "romântico"
+    ]
+  },
+  {
+    "id": "34",
+    "title": "Mensagem Para Você",
+    "year": 1998,
+    "genres": [
+      "Comédia Romântica"
+    ],
+    "description": "Dois rivais no mundo dos negócios trocam mensagens anônimas pela internet sem saber que, na vida real, vivem em conflito.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/e/ee/Youve_Got_Mail.jpg",
+    "platforms": [
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.7,
+    "moods": [
+      "clássico",
+      "doce",
+      "romântico"
+    ]
+  },
+  {
+    "id": "35",
+    "title": "Sintonia de Amor",
+    "year": 1993,
+    "genres": [
+      "Comédia Romântica",
+      "Drama"
+    ],
+    "description": "Depois de ouvir um viúvo falar sobre amor no rádio, Annie sente uma conexão inexplicável com ele, mesmo vivendo longe e estando noiva de outro homem.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/e/e2/Sleepless_in_Seattle.jpg",
+    "platforms": [
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.8,
+    "moods": [
+      "clássico",
+      "delicado",
+      "romântico"
+    ]
+  },
+  {
+    "id": "36",
+    "title": "O Casamento do Meu Melhor Amigo",
+    "year": 1997,
+    "genres": [
+      "Comédia Romântica"
+    ],
+    "description": "Julianne percebe que ama seu melhor amigo poucos dias antes do casamento dele e decide tentar impedir a cerimônia.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/d/dc/My_Best_Friend%27s_Wedding_Poster.jpg",
+    "platforms": [
+      "Netflix",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.3,
+    "moods": [
+      "clássico",
+      "divertido",
+      "agridoce"
+    ]
+  },
+  {
+    "id": "37",
+    "title": "Noiva em Fuga",
+    "year": 1999,
+    "genres": [
+      "Comédia Romântica"
+    ],
+    "description": "Uma mulher conhecida por fugir de seus casamentos vira tema de uma reportagem, mas acaba se envolvendo com o jornalista que investiga sua história.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/b/b2/Runaway_bride.jpg",
+    "platforms": [
+      "Disney+",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 5.6,
+    "moods": [
+      "leve",
+      "clássico",
+      "romântico"
+    ]
+  },
+  {
+    "id": "38",
+    "title": "E Se Fosse Verdade",
+    "year": 2005,
+    "genres": [
+      "Comédia Romântica",
+      "Fantasia"
+    ],
+    "description": "Um homem se muda para um apartamento e começa a ver o espírito de uma mulher que insiste que aquele lugar ainda é dela.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/3/3c/Just_like_heaven.jpg",
+    "platforms": [
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.7,
+    "moods": [
+      "leve",
+      "fantástico",
+      "romântico"
+    ]
+  },
+  {
+    "id": "39",
+    "title": "Amor à Segunda Vista",
+    "year": 2002,
+    "genres": [
+      "Comédia Romântica"
+    ],
+    "description": "Uma advogada idealista trabalha para um empresário rico e imaturo, mas a relação profissional começa a ganhar sentimentos inesperados.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/2/2b/Two_Weeks_Notice_film.jpg",
+    "platforms": [
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.2,
+    "moods": [
+      "leve",
+      "divertido",
+      "romântico"
+    ]
+  },
+  {
+    "id": "40",
+    "title": "Amizade Colorida",
+    "year": 2011,
+    "genres": [
+      "Comédia Romântica"
+    ],
+    "description": "Dois amigos decidem ter uma relação sem compromisso, mas descobrem que separar desejo e sentimento pode ser mais difícil do que imaginavam.",
+    "posterUrl": "https://upload.wikimedia.org/wikipedia/en/7/7c/Friends_with_benefits_poster.jpg",
+    "platforms": [
+      "Netflix",
+      "Apple TV",
+      "Amazon Video"
+    ],
+    "rating": 6.5,
+    "moods": [
+      "divertido",
+      "moderno",
+      "romântico"
+    ]
   }
 ];
 
