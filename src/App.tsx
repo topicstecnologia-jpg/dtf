@@ -15,6 +15,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { ChatPage } from './pages/ChatPage';
 import { HomePage } from './pages/HomePage';
 import { PostPage } from './pages/PostPage';
+import { CommunitiesPage } from './pages/CommunitiesPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { SplashScreen } from './components/SplashScreen';
 
@@ -59,6 +60,7 @@ export default function App() {
           
           <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/feed" element={<ProtectedRoute><FeedPage /></ProtectedRoute>} />
+          <Route path="/communities" element={<ProtectedRoute><CommunitiesPage /></ProtectedRoute>} />
           <Route path="/matches" element={<ProtectedRoute><MatchesPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
           <Route path="/profile/:userId" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

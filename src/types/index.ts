@@ -35,6 +35,42 @@ export interface Post {
   timestamp: number;
 }
 
+export interface CommunityPost {
+  id: string;
+  communityId: string;
+  userId: string;
+  type: 'image' | 'text';
+  imageUrl?: string;
+  text: string;
+  timestamp: number;
+}
+
+export interface CommunityGroup {
+  id: string;
+  name: string;
+}
+
+export interface CommunityFeatures {
+  cineLive: boolean;
+  groups: boolean;
+  posts: boolean;
+  cineLiveUrl?: string;
+}
+
+export interface Community {
+  id: string;
+  ownerId?: string;
+  name: string;
+  description: string;
+  coverUrl?: string;
+  avatarUrl?: string;
+  features: CommunityFeatures;
+  groups: CommunityGroup[];
+  memberIds: string[];
+  posts: CommunityPost[];
+  createdAt: number;
+}
+
 export interface Story {
   id: string;
   userId: string;
@@ -67,6 +103,10 @@ export interface User {
   matches: string[];
   savedPosts: string[];
   followingIds?: string[];
+  referredBy?: string;
+  directorEligible?: boolean;
+  directorCelebrationSeen?: boolean;
+  createdAt?: number;
   stats: {
     following: number;
     followers: number;

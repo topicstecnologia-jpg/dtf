@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Play, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon } from 'lucide-react';
+import { Home, Play, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon, Clapperboard, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation();
-  const { user, unreadMessageCount, updateHandle, createPost } = useApp();
+  const { user, unreadMessageCount, updateHandle, createPost, directorCelebrationOpen, dismissDirectorCelebration } = useApp();
   const [handleInput, setHandleInput] = useState(user?.handle?.replace(/^@/, '') || '');
   const [handleError, setHandleError] = useState('');
   const [isSavingHandle, setIsSavingHandle] = useState(false);
@@ -24,6 +24,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const navItems = [
     { path: '/home', icon: Home, label: 'Início' },
     { path: '/feed', icon: Play, label: 'Recomendações' },
+    { path: '/communities', icon: Clapperboard, label: 'Comunidades' },
     { path: '/matches', icon: MessageCircle, label: 'Conversas' },
     { path: '/profile', icon: User, label: 'Perfil' },
   ];
@@ -111,7 +112,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       {!isChatPage && (
-        <nav className="fixed bottom-5 left-5 right-5 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[430px] h-16 md:h-14 bg-[#222226]/90 backdrop-blur-xl rounded-full shadow-2xl flex items-center justify-between px-5 md:px-5 z-50 border border-white/10">
+        <nav className="fixed bottom-5 left-5 right-5 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[460px] h-16 md:h-14 bg-[#222226]/90 backdrop-blur-xl rounded-full shadow-2xl flex items-center justify-between px-4 md:px-5 z-50 border border-white/10">
           {navItems.slice(0, 2).map((item) => {
             const isActive = pathname === item.path;
             return (
@@ -267,6 +268,39 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </motion.form>
         </div>
       )}
+
+      <AnimatePresence>
+        {directorCelebrationOpen && (
+          <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/85 p-6 backdrop-blur-xl">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.88, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-sm rounded-[32px] border border-[#E4B5C2]/25 bg-[#1F1F24] p-7 text-center shadow-2xl"
+            >
+              <motion.div
+                initial={{ rotate: -12, scale: 0.8 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ delay: 0.15, type: 'spring' }}
+                className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-[#3F1521] text-[#E4B5C2]"
+              >
+                <Sparkles size={34} />
+              </motion.div>
+              <h2 className="text-2xl font-bold">Parabéns!</h2>
+              <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+                Você se tornou um diretor e pode criar a sua comunidade de cinema.
+              </p>
+              <button
+                type="button"
+                onClick={dismissDirectorCelebration}
+                className="mt-6 h-12 w-full rounded-full bg-white font-bold text-black"
+              >
+                Começar
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment, Story } from '../types';
+import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment, Story, Community, CommunityPost } from '../types';
 import { MOVIES } from '../data/mock';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { createDefaultProfile, mapProfileRowToUser, mapUserToProfileRow, normalizeHandle } from '../lib/profile';
@@ -12,13 +12,16 @@ interface AppContextType {
   chats: Chat[];
   posts: Post[];
   stories: Story[];
+  communities: Community[];
   onlineUserIds: string[];
   unreadMessageCount: number;
+  referralCount: number;
+  directorCelebrationOpen: boolean;
   currentMovieIndex: number;
   isLoading: boolean;
   authError: string;
   login: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name?: string, handle?: string) => Promise<void>;
+  signUp: (email: string, password: string, name?: string, handle?: string, referredBy?: string) => Promise<void>;
   resendConfirmation: (email: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
@@ -28,6 +31,17 @@ interface AppContextType {
   updateFavoriteMovies: (movieIds: string[]) => Promise<void>;
   updateEmail: (email: string) => Promise<void>;
   deleteAccount: () => Promise<void>;
+  dismissDirectorCelebration: () => Promise<void>;
+  createCommunity: (values: {
+    name: string;
+    description: string;
+    coverFile?: File | null;
+    avatarFile?: File | null;
+    features: Community['features'];
+    groups: string[];
+  }) => Promise<void>;
+  joinCommunity: (communityId: string) => Promise<void>;
+  createCommunityPost: (communityId: string, values: { text: string; imageFile?: File | null }) => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
   updatePost: (postId: string, values: { caption: string }) => Promise<void>;
@@ -65,7 +79,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [chats, setChats] = useState<Chat[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
+  const [communities, setCommunities] = useState<Community[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
+  const [directorCelebrationOpen, setDirectorCelebrationOpen] = useState(false);
   const [readMessagesByMatch, setReadMessagesByMatch] = useState<Record<string, number>>({});
   const [currentMovieIndex, setCurrentMovieIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,6 +126,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return chat?.messages.filter(message => (
       message.senderId !== user.id && message.timestamp > lastReadAt
     )).length || 0;
+  };
+
+  const referralCount = useMemo(() => {
+    if (!user) return 0;
+    const joinedUntil = (user.createdAt || Date.now()) + 1000 * 60 * 60 * 24 * 7;
+    return profileUsers.filter(profile => (
+      profile.referredBy === user.id &&
+      (profile.createdAt || 0) <= joinedUntil
+    )).length;
+  }, [profileUsers, user?.id, user?.createdAt]);
+
+  const cineClubCommunity: Community = {
+    id: '00000000-0000-0000-0000-000000000001',
+    name: 'CineClub',
+    description: 'A comunidade principal do DTF para assistir, comentar e descobrir cinema junto.',
+    coverUrl: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80',
+    avatarUrl: 'https://i.postimg.cc/GpHmXR5D/Design-sem-nome.png',
+    features: {
+      cineLive: true,
+      groups: true,
+      posts: true,
+      cineLiveUrl: 'https://www.youtube.com/'
+    },
+    groups: [
+      { id: 'cineclub-geral', name: 'Geral' },
+      { id: 'cineclub-romance', name: 'Romances' },
+      { id: 'cineclub-sessao', name: 'Sessão ao vivo' }
+    ],
+    memberIds: user ? [user.id] : [],
+    posts: [],
+    createdAt: Date.now()
   };
 
   const attachPostToProfile = (post: Post) => {
@@ -237,6 +284,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : undefined
   });
 
+  const mapCommunityPostRow = (row: any): CommunityPost => ({
+    id: row.id,
+    communityId: row.community_id,
+    userId: row.user_id,
+    type: row.type,
+    imageUrl: row.image_url || undefined,
+    text: row.text || '',
+    timestamp: new Date(row.created_at).getTime()
+  });
+
+  const mapCommunityRow = (row: any): Community => ({
+    id: row.id,
+    ownerId: row.owner_id || undefined,
+    name: row.name,
+    description: row.description || '',
+    coverUrl: row.cover_url || undefined,
+    avatarUrl: row.avatar_url || undefined,
+    features: {
+      cineLive: Boolean(row.features?.cineLive),
+      groups: Boolean(row.features?.groups),
+      posts: row.features?.posts !== false,
+      cineLiveUrl: row.features?.cineLiveUrl || ''
+    },
+    groups: row.groups || [],
+    memberIds: (row.community_members || []).map((member: any) => member.user_id),
+    posts: (row.community_posts || []).map(mapCommunityPostRow),
+    createdAt: new Date(row.created_at).getTime()
+  });
+
   const hydratePostViews = async (mappedPosts: Post[]) => {
     if (!supabase || mappedPosts.length === 0) return mappedPosts;
 
@@ -315,8 +391,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStories((data || []).map(mapStoryRow));
   };
 
+  const loadCommunities = async () => {
+    if (!supabase) {
+      setCommunities([cineClubCommunity]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('communities')
+      .select('*, community_members(user_id), community_posts(*)')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      setCommunities([cineClubCommunity]);
+      return;
+    }
+
+    const mapped = (data || []).map(mapCommunityRow);
+    const hasCineClub = mapped.some(community => community.id === cineClubCommunity.id);
+    setCommunities(hasCineClub ? mapped : [cineClubCommunity, ...mapped]);
+  };
+
   const refreshAppData = async (currentUserId: string) => {
-    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadPosts(), loadStories()]);
+    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadPosts(), loadStories(), loadCommunities()]);
   };
 
   const syncSession = async () => {
@@ -346,6 +443,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       await persistProfile(currentProfile);
       profiles = await loadProfiles();
+    }
+
+    const referralWindowEndsAt = (currentProfile.createdAt || Date.now()) + 1000 * 60 * 60 * 24 * 7;
+    const validReferralCount = profiles.filter(profile => (
+      profile.referredBy === currentProfile?.id &&
+      (profile.createdAt || 0) <= referralWindowEndsAt
+    )).length;
+    const shouldBecomeDirector = validReferralCount >= 5;
+
+    if (shouldBecomeDirector && !currentProfile.directorEligible) {
+      currentProfile = { ...currentProfile, directorEligible: true };
+      await supabase
+        .from('profiles')
+        .update({ director_eligible: true })
+        .eq('id', currentProfile.id);
+      profiles = profiles.map(profile => profile.id === currentProfile?.id ? currentProfile! : profile);
+    }
+
+    if (currentProfile.directorEligible && !currentProfile.directorCelebrationSeen) {
+      setDirectorCelebrationOpen(true);
     }
 
     setUser(currentProfile);
@@ -706,6 +823,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       )
       .on(
         'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'profiles' },
+        () => {
+          loadProfiles();
+        }
+      )
+      .on(
+        'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'stories' },
         (payload) => {
           appendStory(mapStoryRow(payload.new as any));
@@ -757,6 +881,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           applyViewToStory(row.story_id, row.user_id);
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'communities' },
+        () => {
+          loadCommunities();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'community_members' },
+        () => {
+          loadCommunities();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'community_posts' },
+        () => {
+          loadCommunities();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -782,14 +927,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return `${window.location.origin}${path}`;
   };
 
-  const signUp = async (email: string, password: string, name?: string, handle?: string) => {
+  const signUp = async (email: string, password: string, name?: string, handle?: string, referredBy?: string) => {
     if (!supabase) throw new Error('Supabase nao esta configurado.');
     setAuthError('');
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name: name || email.split('@')[0], handle },
+        data: { name: name || email.split('@')[0], handle, referred_by: referredBy },
         emailRedirectTo: getAuthRedirectUrl('/home')
       }
     });
@@ -807,6 +952,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (data.user) {
       const profile = createDefaultProfile(data.user.id, email, name, handle);
+      profile.referredBy = referredBy && referredBy !== data.user.id ? referredBy : undefined;
       await persistProfile(profile);
       setUser(profile);
       await refreshAppData(data.user.id);
@@ -951,6 +1097,121 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     await logout();
+  };
+
+  const dismissDirectorCelebration = async () => {
+    if (!user || !supabase) {
+      setDirectorCelebrationOpen(false);
+      return;
+    }
+
+    await supabase
+      .from('profiles')
+      .update({ director_celebration_seen: true })
+      .eq('id', user.id);
+
+    const updatedUser = { ...user, directorCelebrationSeen: true };
+    setUser(updatedUser);
+    setProfileUsers(prev => prev.map(profile => profile.id === user.id ? updatedUser : profile));
+    setDirectorCelebrationOpen(false);
+  };
+
+  const uploadCommunityImage = async (file: File, folder: string) => {
+    if (!user || !supabase) return '';
+    const extension = file.name.split('.').pop() || 'jpg';
+    const filePath = `${user.id}/${folder}-${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from('community-media')
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) throw new Error(uploadError.message);
+
+    const { data } = supabase.storage.from('community-media').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const createCommunity = async (values: {
+    name: string;
+    description: string;
+    coverFile?: File | null;
+    avatarFile?: File | null;
+    features: Community['features'];
+    groups: string[];
+  }) => {
+    if (!user || !supabase) return;
+    if (!user.directorEligible) throw new Error('Você precisa se tornar Diretor para criar uma comunidade.');
+
+    const existingCommunity = communities.find(community => community.ownerId === user.id);
+    if (existingCommunity) throw new Error('Cada Diretor pode criar apenas 1 comunidade.');
+    if (!values.name.trim()) throw new Error('Informe o nome da comunidade.');
+
+    const coverUrl = values.coverFile ? await uploadCommunityImage(values.coverFile, 'cover') : '';
+    const avatarUrl = values.avatarFile ? await uploadCommunityImage(values.avatarFile, 'avatar') : '';
+    const groups = values.features.groups
+      ? values.groups.filter(Boolean).slice(0, 3).map((name, index) => ({ id: `group-${index + 1}`, name }))
+      : [];
+
+    const { data, error } = await supabase
+      .from('communities')
+      .insert({
+        owner_id: user.id,
+        name: values.name.trim(),
+        description: values.description.trim(),
+        cover_url: coverUrl,
+        avatar_url: avatarUrl,
+        features: values.features,
+        groups
+      })
+      .select('*, community_members(user_id), community_posts(*)')
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await joinCommunity(data.id);
+    await loadCommunities();
+  };
+
+  const joinCommunity = async (communityId: string) => {
+    if (!user || !supabase) return;
+
+    const { error } = await supabase
+      .from('community_members')
+      .upsert({ community_id: communityId, user_id: user.id }, { onConflict: 'community_id,user_id' });
+
+    if (error && communityId !== cineClubCommunity.id) throw new Error(error.message);
+
+    setCommunities(prev => prev.map(community => (
+      community.id === communityId
+        ? { ...community, memberIds: Array.from(new Set([...community.memberIds, user.id])) }
+        : community
+    )));
+  };
+
+  const createCommunityPost = async (communityId: string, values: { text: string; imageFile?: File | null }) => {
+    if (!user || !supabase) return;
+    if (!values.text.trim() && !values.imageFile) throw new Error('Escreva algo ou selecione uma imagem.');
+
+    const imageUrl = values.imageFile ? await uploadCommunityImage(values.imageFile, 'post') : '';
+    const { data, error } = await supabase
+      .from('community_posts')
+      .insert({
+        community_id: communityId,
+        user_id: user.id,
+        type: imageUrl ? 'image' : 'text',
+        image_url: imageUrl,
+        text: values.text.trim()
+      })
+      .select('*')
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    const mappedPost = mapCommunityPostRow(data);
+    setCommunities(prev => prev.map(community => (
+      community.id === communityId
+        ? { ...community, posts: [mappedPost, ...community.posts] }
+        : community
+    )));
   };
 
   const updateFavoriteMovies = async (movieIds: string[]) => {
@@ -1565,8 +1826,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     chats,
     posts,
     stories,
+    communities,
     onlineUserIds,
     unreadMessageCount,
+    referralCount,
+    directorCelebrationOpen,
     currentMovieIndex,
     isLoading,
     authError,
@@ -1582,6 +1846,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateFavoriteMovies,
     updateEmail,
     deleteAccount,
+    dismissDirectorCelebration,
+    createCommunity,
+    joinCommunity,
+    createCommunityPost,
     toggleFollowUser,
     createPost,
     updatePost,
@@ -1606,7 +1874,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     markChatRead,
     getUnreadMessagesForMatch,
     isUserOnline
-  }), [user, profileUsers, movies, matches, chats, posts, stories, onlineUserIds, unreadMessageCount, currentMovieIndex, isLoading, authError, readMessagesByMatch]);
+  }), [user, profileUsers, movies, matches, chats, posts, stories, communities, onlineUserIds, unreadMessageCount, referralCount, directorCelebrationOpen, currentMovieIndex, isLoading, authError, readMessagesByMatch]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

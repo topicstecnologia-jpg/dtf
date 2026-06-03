@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '../components/Button';
@@ -20,6 +20,17 @@ export const LoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [localError, setLocalError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [referrerId, setReferrerId] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref') || localStorage.getItem('dtf:referrer-id') || '';
+    if (ref) {
+      setReferrerId(ref);
+      localStorage.setItem('dtf:referrer-id', ref);
+      setMode('signup');
+    }
+  }, []);
 
   const resetFeedback = () => {
     setLocalError('');
@@ -78,7 +89,8 @@ export const LoginPage: React.FC = () => {
 
     try {
       if (mode === 'signup') {
-        await signUp(email, password, name, handle);
+        await signUp(email, password, name, handle, referrerId || undefined);
+        localStorage.removeItem('dtf:referrer-id');
       } else {
         await login(email, password);
       }

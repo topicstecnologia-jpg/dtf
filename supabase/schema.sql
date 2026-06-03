@@ -16,6 +16,9 @@ create table if not exists public.profiles (
   matches jsonb not null default '[]'::jsonb,
   saved_posts jsonb not null default '[]'::jsonb,
   following_ids jsonb not null default '[]'::jsonb,
+  referred_by uuid references public.profiles(id) on delete set null,
+  director_eligible boolean not null default false,
+  director_celebration_seen boolean not null default false,
   stats jsonb not null default '{"following":0,"followers":0,"creations":0}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -119,6 +122,36 @@ create table if not exists public.story_views (
   primary key (story_id, user_id)
 );
 
+create table if not exists public.communities (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid references public.profiles(id) on delete cascade,
+  name text not null,
+  description text,
+  cover_url text,
+  avatar_url text,
+  features jsonb not null default '{"cineLive":true,"groups":true,"posts":true,"cineLiveUrl":""}'::jsonb,
+  groups jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  constraint communities_one_per_owner unique (owner_id)
+);
+
+create table if not exists public.community_members (
+  community_id uuid not null references public.communities(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (community_id, user_id)
+);
+
+create table if not exists public.community_posts (
+  id uuid primary key default gen_random_uuid(),
+  community_id uuid not null references public.communities(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  type text not null default 'text' check (type in ('image', 'text')),
+  image_url text,
+  text text,
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles
   add column if not exists username_configured boolean not null default false;
 
@@ -127,6 +160,15 @@ alter table public.profiles
 
 alter table public.profiles
   add column if not exists following_ids jsonb not null default '[]'::jsonb;
+
+alter table public.profiles
+  add column if not exists referred_by uuid references public.profiles(id) on delete set null;
+
+alter table public.profiles
+  add column if not exists director_eligible boolean not null default false;
+
+alter table public.profiles
+  add column if not exists director_celebration_seen boolean not null default false;
 
 alter table public.stories
   add column if not exists expires_at timestamptz not null default (now() + interval '24 hours');
@@ -158,6 +200,10 @@ on conflict (id) do update set public = true;
 
 insert into storage.buckets (id, name, public)
 values ('story-media', 'story-media', true)
+on conflict (id) do update set public = true;
+
+insert into storage.buckets (id, name, public)
+values ('community-media', 'community-media', true)
 on conflict (id) do update set public = true;
 
 drop policy if exists "Avatar files are public" on storage.objects;
@@ -298,6 +344,33 @@ create policy "Users can remove their story media"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+drop policy if exists "Community media files are public" on storage.objects;
+create policy "Community media files are public"
+  on storage.objects for select
+  using (bucket_id = 'community-media');
+
+drop policy if exists "Users can upload community media" on storage.objects;
+create policy "Users can upload community media"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'community-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "Users can update community media" on storage.objects;
+create policy "Users can update community media"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'community-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'community-media'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
@@ -395,6 +468,42 @@ begin
   then
     alter publication supabase_realtime add table public.story_views;
   end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'communities'
+    )
+  then
+    alter publication supabase_realtime add table public.communities;
+  end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'community_members'
+    )
+  then
+    alter publication supabase_realtime add table public.community_members;
+  end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'community_posts'
+    )
+  then
+    alter publication supabase_realtime add table public.community_posts;
+  end if;
 end;
 $$;
 
@@ -437,13 +546,15 @@ declare
   display_name text;
   normalized_handle text;
   requested_handle text;
+  referrer_id uuid;
 begin
   display_name := coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1), 'Usuario');
   requested_handle := nullif(trim(both '@' from coalesce(new.raw_user_meta_data->>'handle', '')), '');
+  referrer_id := nullif(new.raw_user_meta_data->>'referred_by', '')::uuid;
   normalized_handle := lower(regexp_replace(coalesce(requested_handle, display_name), '[^a-zA-Z0-9_]+', '_', 'g'));
   normalized_handle := trim(both '_' from normalized_handle);
 
-  insert into public.profiles (id, name, handle, username_configured, avatar_url, cover_url, bio)
+  insert into public.profiles (id, name, handle, username_configured, avatar_url, cover_url, bio, referred_by)
   values (
     new.id,
     display_name,
@@ -451,7 +562,8 @@ begin
     requested_handle is not null,
     '',
     'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80',
-    'Apaixonado por cinema.'
+    'Apaixonado por cinema.',
+    case when referrer_id = new.id then null else referrer_id end
   )
   on conflict (id) do nothing;
 
@@ -476,6 +588,9 @@ alter table public.post_views enable row level security;
 alter table public.story_likes enable row level security;
 alter table public.story_comments enable row level security;
 alter table public.story_views enable row level security;
+alter table public.communities enable row level security;
+alter table public.community_members enable row level security;
+alter table public.community_posts enable row level security;
 
 drop policy if exists "Profiles are visible to authenticated users" on public.profiles;
 create policy "Profiles are visible to authenticated users"
@@ -704,6 +819,95 @@ create policy "Users can like as themselves"
 drop policy if exists "Users can remove their own likes" on public.post_likes;
 create policy "Users can remove their own likes"
   on public.post_likes for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+insert into public.communities (id, owner_id, name, description, cover_url, avatar_url, features, groups)
+values (
+  '00000000-0000-0000-0000-000000000001',
+  null,
+  'CineClub',
+  'A comunidade principal do DTF para assistir, comentar e descobrir cinema junto.',
+  'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80',
+  'https://i.postimg.cc/GpHmXR5D/Design-sem-nome.png',
+  '{"cineLive":true,"groups":true,"posts":true,"cineLiveUrl":"https://www.youtube.com/"}'::jsonb,
+  '[{"id":"cineclub-geral","name":"Geral"},{"id":"cineclub-romance","name":"Romances"},{"id":"cineclub-sessao","name":"Sessão ao vivo"}]'::jsonb
+)
+on conflict (id) do update set
+  name = excluded.name,
+  description = excluded.description,
+  cover_url = excluded.cover_url,
+  avatar_url = excluded.avatar_url,
+  features = excluded.features,
+  groups = excluded.groups;
+
+drop policy if exists "Communities are visible to authenticated users" on public.communities;
+create policy "Communities are visible to authenticated users"
+  on public.communities for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Directors can create one community" on public.communities;
+create policy "Directors can create one community"
+  on public.communities for insert
+  to authenticated
+  with check (
+    auth.uid() = owner_id
+    and exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid()
+      and profiles.director_eligible = true
+    )
+  );
+
+drop policy if exists "Directors can update their communities" on public.communities;
+create policy "Directors can update their communities"
+  on public.communities for update
+  to authenticated
+  using (auth.uid() = owner_id)
+  with check (auth.uid() = owner_id);
+
+drop policy if exists "Community members are visible to authenticated users" on public.community_members;
+create policy "Community members are visible to authenticated users"
+  on public.community_members for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Users can join communities" on public.community_members;
+create policy "Users can join communities"
+  on public.community_members for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Community posts are visible to authenticated users" on public.community_posts;
+create policy "Community posts are visible to authenticated users"
+  on public.community_posts for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Community members can create posts" on public.community_posts;
+create policy "Community members can create posts"
+  on public.community_posts for insert
+  to authenticated
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.community_members
+      where community_members.community_id = community_posts.community_id
+      and community_members.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Users can update their community posts" on public.community_posts;
+create policy "Users can update their community posts"
+  on public.community_posts for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can remove their community posts" on public.community_posts;
+create policy "Users can remove their community posts"
+  on public.community_posts for delete
   to authenticated
   using (auth.uid() = user_id);
 
