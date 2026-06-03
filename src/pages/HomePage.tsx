@@ -8,7 +8,7 @@ import { Post, Story } from '../types';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, posts, stories, matches, sendMessage, addComment, addStoryComment, toggleLikeStory, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory } = useApp();
+  const { user, posts, stories, matches, sendMessage, addComment, startChat, toggleLikeStory, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory } = useApp();
   const [activeTab, setActiveTab] = useState('Community');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
@@ -150,8 +150,22 @@ export const HomePage: React.FC = () => {
   const handleAddStoryComment = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!liveSelectedStory || !storyCommentText.trim()) return;
-    await addStoryComment(liveSelectedStory.id, storyCommentText);
+    if (liveSelectedStory.userId === user?.id) {
+      setStoryCommentText('');
+      return;
+    }
+
+    const storyOwner = getUserById(liveSelectedStory.userId);
+    const matchId = await startChat(liveSelectedStory.userId);
+    if (!matchId) return;
+
+    await sendMessage(
+      matchId,
+      `Respondeu sua Cena${storyOwner?.handle ? ` (${storyOwner.handle})` : ''}: ${storyCommentText.trim()}`
+    );
     setStoryCommentText('');
+    setPostActionMessage('Resposta enviada no chat.');
+    setTimeout(() => setPostActionMessage(''), 1800);
   };
 
   useEffect(() => {
@@ -1039,22 +1053,13 @@ export const HomePage: React.FC = () => {
                     )}
 
                     <div className="absolute inset-x-0 bottom-0 z-20 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/70 to-transparent">
-                      {liveSelectedStory.comments.length > 0 && (
-                        <div className="mb-3 max-h-28 space-y-2 overflow-y-auto scrollbar-hide">
-                          {liveSelectedStory.comments.slice(-3).map(comment => (
-                            <div key={comment.id} className="rounded-2xl bg-black/30 px-3 py-2 backdrop-blur-sm">
-                              <p className="text-xs font-bold text-white">{comment.userName}</p>
-                              <p className="text-xs text-white/80">{comment.text}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                       <form onSubmit={handleAddStoryComment} className="flex items-center gap-3">
                         <input
                           value={storyCommentText}
                           onChange={(event) => setStoryCommentText(event.target.value)}
                           className="h-12 min-w-0 flex-1 rounded-full border border-white/80 bg-black/25 px-5 text-sm text-white outline-none placeholder:text-white/75 backdrop-blur-sm"
-                          placeholder={`Responder a ${storyUser?.handle || 'esta cena'}...`}
+                          placeholder={liveSelectedStory.userId === user?.id ? 'Sua Cena' : `Responder a ${storyUser?.handle || 'esta cena'}...`}
+                          disabled={liveSelectedStory.userId === user?.id}
                         />
                         <button
                           type="button"
@@ -1069,7 +1074,7 @@ export const HomePage: React.FC = () => {
                       </form>
                       <div className="mt-2 flex items-center gap-4 pl-2 text-xs text-white/75">
                         <span>{liveSelectedStory.likes} curtidas</span>
-                        <span>{liveSelectedStory.comments.length} comentarios</span>
+                        <span>respostas vao para o chat</span>
                       </div>
                     </div>
                   </>

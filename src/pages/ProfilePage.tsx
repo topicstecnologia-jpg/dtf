@@ -28,6 +28,7 @@ export const ProfilePage: React.FC = () => {
   const [editPostCaption, setEditPostCaption] = useState('');
   const [postActionError, setPostActionError] = useState('');
   const [isSavingPost, setIsSavingPost] = useState(false);
+  const [socialList, setSocialList] = useState<'following' | 'followers' | null>(null);
 
   const decodedParam = userId ? decodeURIComponent(userId) : '';
   const isCurrentUser = !userId || userId === currentUser?.id || decodedParam.toLowerCase() === currentUser?.handle?.toLowerCase();
@@ -45,9 +46,15 @@ export const ProfilePage: React.FC = () => {
   );
 
   const compatibility = match?.compatibility.overall || (isCurrentUser ? null : Math.floor(Math.random() * 20) + 75);
-  const stats = profileUser.stats || { following: 0, followers: 0, creations: 0 };
   const isFollowing = Boolean(currentUser?.followingIds?.includes(profileUser.id));
   const posts = profileUser.posts || [];
+  const followingProfiles = profileUsers.filter(profile => profileUser.followingIds?.includes(profile.id));
+  const followerProfiles = profileUsers.filter(profile => profile.followingIds?.includes(profileUser.id));
+  const stats = {
+    following: followingProfiles.length,
+    followers: followerProfiles.length,
+    creations: posts.length
+  };
   const liveSelectedPost = selectedPost ? posts.find(post => post.id === selectedPost.id) || selectedPost : null;
   const liveOriginalPost = liveSelectedPost?.repostOfId ? allPosts.find(post => post.id === liveSelectedPost.repostOfId) : null;
   const liveDisplayPost = liveOriginalPost || liveSelectedPost;
@@ -68,6 +75,7 @@ export const ProfilePage: React.FC = () => {
     if (activeTab === 'reposts') return post.type === 'repost';
     return false;
   });
+  const socialProfiles = socialList === 'following' ? followingProfiles : followerProfiles;
 
   useEffect(() => {
     if (!currentUser || isCurrentUser) return;
@@ -252,14 +260,14 @@ export const ProfilePage: React.FC = () => {
         )}
 
         <div className="flex justify-center space-x-10 mb-5 w-full">
-          <div className="flex flex-col items-center">
+          <button type="button" onClick={() => setSocialList('following')} className="flex flex-col items-center">
             <span className="font-bold text-base">{stats.following}</span>
-            <span className="text-xs text-gray-400">Following</span>
-          </div>
-          <div className="flex flex-col items-center">
+            <span className="text-xs text-gray-400">Seguindo</span>
+          </button>
+          <button type="button" onClick={() => setSocialList('followers')} className="flex flex-col items-center">
             <span className="font-bold text-base">{stats.followers}</span>
-            <span className="text-xs text-gray-400">Followers</span>
-          </div>
+            <span className="text-xs text-gray-400">Seguidores</span>
+          </button>
           <div className="flex flex-col items-center">
             <span className="font-bold text-base">{stats.creations}</span>
             <span className="text-xs text-gray-400">Posts</span>
@@ -566,6 +574,62 @@ export const ProfilePage: React.FC = () => {
                   </p>
                   {postActionError && <p className="text-sm text-red-300">{postActionError}</p>}
                 </>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {socialList && (
+        <div className="fixed inset-0 z-[128] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md max-h-[82vh] overflow-hidden rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] shadow-2xl"
+          >
+            <div className="flex items-center justify-between p-5 border-b border-white/10">
+              <div>
+                <h2 className="text-xl font-bold">{socialList === 'following' ? 'Seguindo' : 'Seguidores'}</h2>
+                <p className="text-xs text-zinc-500">{profileUser.handle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSocialList(null)}
+                className="p-2 rounded-full bg-white/5 text-zinc-300 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="max-h-[65vh] overflow-y-auto p-3">
+              {socialProfiles.length === 0 ? (
+                <p className="py-12 text-center text-sm text-zinc-500">
+                  {socialList === 'following' ? 'Ainda nao segue ninguem.' : 'Ainda nao ha seguidores.'}
+                </p>
+              ) : (
+                socialProfiles.map(profile => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => {
+                      setSocialList(null);
+                      navigate(`/profile/${profile.handle}`);
+                    }}
+                    className="w-full flex items-center gap-3 rounded-2xl p-3 text-left hover:bg-white/5"
+                  >
+                    {profile.avatarUrl ? (
+                      <img src={profile.avatarUrl} alt={profile.name} className="h-12 w-12 rounded-full object-cover" />
+                    ) : (
+                      <div className="h-12 w-12 rounded-full bg-[#3F1521] flex items-center justify-center font-bold">
+                        {profile.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-white">{profile.name}</p>
+                      <p className="truncate text-xs text-zinc-500">{profile.handle}</p>
+                    </div>
+                  </button>
+                ))
               )}
             </div>
           </motion.div>
