@@ -94,7 +94,7 @@ export const ChatPage: React.FC = () => {
     return {
       kind: 'post_share',
       postId: linkMatch[1],
-      authorName: author?.name || 'Publicacao',
+      authorName: author?.name || 'Publicação',
       authorHandle: author?.handle || '',
       caption: post?.caption || 'Toque para ver o post',
       type: post?.type,
@@ -151,7 +151,7 @@ export const ChatPage: React.FC = () => {
     setRecordingError('');
 
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setRecordingError('Gravacao de audio nao esta disponivel neste navegador.');
+      setRecordingError('Gravação de áudio não está disponível neste navegador.');
       return;
     }
 
@@ -173,7 +173,7 @@ export const ChatPage: React.FC = () => {
         try {
           await sendMediaMessage(matchId, audioBlob, 'audio');
         } catch (error) {
-          setRecordingError(error instanceof Error ? error.message : 'Nao foi possivel enviar o audio.');
+          setRecordingError(error instanceof Error ? error.message : 'Não foi possível enviar o áudio.');
         } finally {
           setIsSendingMedia(false);
         }
@@ -183,7 +183,7 @@ export const ChatPage: React.FC = () => {
       recorder.start();
       setIsRecording(true);
     } catch (error) {
-      setRecordingError(error instanceof Error ? error.message : 'Permita o acesso ao microfone para gravar audio.');
+      setRecordingError(error instanceof Error ? error.message : 'Permita o acesso ao microfone para gravar áudio.');
     }
   };
 
@@ -279,7 +279,7 @@ export const ChatPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setReactionMessageId(prev => prev === msg.id ? null : msg.id)}
-                  className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-black/35 p-1.5 text-white/70 opacity-0 transition-opacity hover:text-white group-hover:opacity-100 ${
+                  className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-black/45 p-1.5 text-white/80 shadow-sm ring-1 ring-white/10 transition-colors hover:bg-black/65 hover:text-white ${
                     isMe ? '-left-10' : '-right-10'
                   }`}
                   aria-label="Reagir a mensagem"
@@ -349,7 +349,7 @@ export const ChatPage: React.FC = () => {
                     <div className="p-3">
                       <div className="flex items-center gap-2 text-xs text-zinc-400">
                         <span className="font-bold text-white truncate">
-                          {sharedPost.authorHandle || sharedPost.authorName || 'Publicacao'}
+                          {sharedPost.authorHandle || sharedPost.authorName || 'Publicação'}
                         </span>
                         <span>post</span>
                       </div>
@@ -408,8 +408,8 @@ export const ChatPage: React.FC = () => {
         {(recordingError || isRecording || isSendingMedia) && (
           <div className="px-4 pb-2 text-xs">
             {recordingError && <p className="text-red-300">{recordingError}</p>}
-            {isRecording && <p className="text-red-300 animate-pulse">Gravando audio... toque no quadrado para enviar.</p>}
-            {isSendingMedia && <p className="text-gray-400">Enviando midia...</p>}
+            {isRecording && <p className="text-red-300 animate-pulse">Gravando áudio... toque no quadrado para enviar.</p>}
+            {isSendingMedia && <p className="text-gray-400">Enviando mídia...</p>}
           </div>
         )}
         <div className="flex items-center space-x-2 bg-[#2A2A30] rounded-full px-4 py-2 border border-white/5">

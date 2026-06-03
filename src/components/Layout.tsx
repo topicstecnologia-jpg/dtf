@@ -22,8 +22,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   }
 
   const navItems = [
-    { path: '/home', icon: Home, label: 'Inicio' },
-    { path: '/feed', icon: Play, label: 'Recomendacoes' },
+    { path: '/home', icon: Home, label: 'Início' },
+    { path: '/feed', icon: Play, label: 'Recomendações' },
     { path: '/matches', icon: MessageCircle, label: 'Conversas' },
     { path: '/profile', icon: User, label: 'Perfil' },
   ];
@@ -44,7 +44,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         ? error.message
         : typeof error === 'object' && error && 'message' in error
           ? String(error.message)
-          : 'Nao foi possivel salvar seu @.';
+        : 'Não foi possível salvar seu @.';
       setHandleError(message);
     } finally {
       setIsSavingHandle(false);
@@ -75,7 +75,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       resetComposer();
       setIsComposingPost(false);
     } catch (error) {
-      setPostError(error instanceof Error ? error.message : 'Nao foi possivel publicar.');
+      setPostError(error instanceof Error ? error.message : 'Não foi possível publicar.');
     } finally {
       setIsPublishing(false);
     }
@@ -230,7 +230,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             className="w-full max-w-md rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#1F1F24] p-6 shadow-2xl"
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-2xl font-bold">Nova publicacao</h2>
+              <h2 className="text-2xl font-bold">Nova publicação</h2>
               <button type="button" onClick={() => setIsComposingPost(false)} className="p-2 rounded-full bg-white/5 text-zinc-400 hover:text-white">
                 <X size={20} />
               </button>

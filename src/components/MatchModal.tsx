@@ -51,7 +51,7 @@ export const MatchModal: React.FC<MatchModalProps> = ({ match, currentUser, onCl
               transition={{ type: 'spring', delay: 0.2 }}
               className="absolute w-48 h-64 rounded-3xl overflow-hidden shadow-xl border-4 border-white z-10"
             >
-              <img src={currentUser.avatarUrl} alt="Voce" className="w-full h-full object-cover" />
+              <img src={currentUser.avatarUrl} alt="Você" className="w-full h-full object-cover" />
             </motion.div>
 
             <motion.div
@@ -78,7 +78,7 @@ export const MatchModal: React.FC<MatchModalProps> = ({ match, currentUser, onCl
               Deu Match!
             </h2>
             <p className="text-gray-500">
-              Voce e {otherUser.name} tem {match.compatibility.overall}% de compatibilidade.
+              Você e {otherUser.name} têm {match.compatibility.overall}% de compatibilidade.
             </p>
           </div>
 

@@ -83,7 +83,7 @@ export const HomePage: React.FC = () => {
   const notificationTabs = [
     { id: 'all', label: 'Tudo' },
     { id: 'likes', label: 'Curtidas' },
-    { id: 'comments', label: 'Comentarios' },
+    { id: 'comments', label: 'Comentários' },
     { id: 'follows', label: 'Novos seguidores' },
     { id: 'profiles', label: 'Perfis' }
   ] as const;
@@ -198,7 +198,7 @@ export const HomePage: React.FC = () => {
       resetSceneComposer();
       setIsComposingScene(false);
     } catch (error) {
-      setSceneError(error instanceof Error ? error.message : 'Nao foi possivel publicar a cena.');
+      setSceneError(error instanceof Error ? error.message : 'Não foi possível publicar a cena.');
     } finally {
       setIsPublishingScene(false);
     }
@@ -210,7 +210,7 @@ export const HomePage: React.FC = () => {
       await deleteStory(selectedStory.id);
       setSelectedStory(null);
     } catch (error) {
-      setSceneError(error instanceof Error ? error.message : 'Nao foi possivel excluir a cena.');
+      setSceneError(error instanceof Error ? error.message : 'Não foi possível excluir a cena.');
     }
   };
 
@@ -222,7 +222,7 @@ export const HomePage: React.FC = () => {
     return (
       <div className="ml-2 w-12 h-12 rounded-xl overflow-hidden bg-[#17171B] border border-white/10 shrink-0">
         {previewImage ? (
-          <img src={previewImage} alt="Publicacao" className="w-full h-full object-cover" />
+          <img src={previewImage} alt="Publicação" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full p-1.5 flex items-center justify-center text-[9px] font-bold text-center leading-tight text-white">
             {post.caption || 'Texto'}
@@ -246,7 +246,7 @@ export const HomePage: React.FC = () => {
       setPostActionMessage('Post republicado.');
       setTimeout(() => setPostActionMessage(''), 1800);
     } catch (error) {
-      setPostActionMessage(error instanceof Error ? error.message : 'Nao foi possivel republicar.');
+      setPostActionMessage(error instanceof Error ? error.message : 'Não foi possível republicar.');
     }
   };
 
@@ -258,7 +258,7 @@ export const HomePage: React.FC = () => {
     await sendMessage(matchId, JSON.stringify({
       kind: 'post_share',
       postId: postToSend.id,
-      authorName: author?.name || 'Usuario',
+      authorName: author?.name || 'Usuário',
       authorHandle: author?.handle || '',
       caption: postToSend.caption,
       type: postToSend.type,
@@ -366,14 +366,14 @@ export const HomePage: React.FC = () => {
                 ) : filteredNotifications.map((notification: any, index) => {
                   const profile = notification.profile;
                   const message = notification.type === 'like'
-                    ? 'curtiu sua publicacao'
+                    ? 'curtiu sua publicação'
                     : notification.type === 'comment'
                       ? `comentou: ${notification.comment.text}`
                       : notification.type === 'follow'
-                        ? 'comecou a seguir voce'
+                        ? 'começou a seguir você'
                         : profile.emotionalProfile === user?.emotionalProfile
                           ? `combina com seu tipo ${user?.emotionalProfile}`
-                          : 'perfil recomendado para voce';
+                          : 'perfil recomendado para você';
 
                   return (
                     <button
@@ -404,7 +404,7 @@ export const HomePage: React.FC = () => {
                         </p>
                         {notification.post && (
                           <p className="mt-1 text-xs text-zinc-500 line-clamp-1">
-                            {notification.post.caption || 'Publicacao sem legenda'}
+                            {notification.post.caption || 'Publicação sem legenda'}
                           </p>
                         )}
                       </div>
@@ -602,7 +602,7 @@ export const HomePage: React.FC = () => {
               const contentUser = originalPost ? getUserById(originalPost.userId) || postUser : postUser;
               const postMovie = MOVIES.find(m => m.id === displayPost.movieId) || {
                 id: post.id,
-                title: displayPost.thumbnailUrl ? 'Publicacao' : 'Texto',
+                title: displayPost.thumbnailUrl ? 'Publicação' : 'Texto',
                 year: new Date(post.timestamp).getFullYear(),
                 genres: displayPost.type === 'text' ? ['Texto'] : ['Feed'],
                 description: displayPost.caption,
@@ -853,7 +853,7 @@ export const HomePage: React.FC = () => {
 
               <div className="space-y-2 max-h-80 overflow-y-auto scrollbar-hide">
                 {matches.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-zinc-500">Nenhuma conversa disponivel.</p>
+                  <p className="py-8 text-center text-sm text-zinc-500">Nenhuma conversa disponível.</p>
                 ) : matches.map(match => {
                   const otherUserId = match.userIds.find(id => id !== user?.id);
                   const otherUser = getUserById(otherUserId);

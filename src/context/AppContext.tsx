@@ -988,16 +988,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const topTrait = sorted[0]?.[0] || 'elegant_dreamer';
     const loveTypeByTrait: Record<string, EmotionalProfileType> = {
       elegant_dreamer: 'Sonhador Elegante',
-      magnetic_intense: 'Intenso Magnetico',
-      loyal_guardian: 'Guardiao Leal',
+      magnetic_intense: 'Intenso Magnético',
+      loyal_guardian: 'Guardião Leal',
       free_soul: 'Alma Livre',
-      nostalgic_heart: 'Coracao Nostalgico',
-      visionary_romantic: 'Romantico Visionario',
+      nostalgic_heart: 'Coração Nostálgico',
+      visionary_romantic: 'Romântico Visionário',
       mysterious_charm: 'Encanto Misterioso',
       romantic: 'Sonhador Elegante',
-      intense: 'Intenso Magnetico',
-      dreamer: 'Coracao Nostalgico',
-      dramatic: 'Intenso Magnetico',
+      intense: 'Intenso Magnético',
+      dreamer: 'Coração Nostálgico',
+      dramatic: 'Intenso Magnético',
       existential: 'Encanto Misterioso'
     };
 
@@ -1111,7 +1111,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updatePost = async (postId: string, values: { caption: string }) => {
     if (!user || !supabase) return;
     const post = posts.find(item => item.id === postId);
-    if (!post || post.userId !== user.id) throw new Error('Voce so pode editar suas proprias postagens.');
+    if (!post || post.userId !== user.id) throw new Error('Você só pode editar suas próprias postagens.');
 
     const caption = values.caption.trim();
     const { data, error } = await supabase
@@ -1129,7 +1129,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deletePost = async (postId: string) => {
     if (!user || !supabase) return;
     const post = posts.find(item => item.id === postId);
-    if (!post || post.userId !== user.id) throw new Error('Voce so pode excluir suas proprias postagens.');
+    if (!post || post.userId !== user.id) throw new Error('Você só pode excluir suas próprias postagens.');
 
     const { error } = await supabase.rpc('delete_own_post', { post_id: postId });
 
@@ -1224,7 +1224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteStory = async (storyId: string) => {
     if (!user || !supabase) return;
     const story = stories.find(item => item.id === storyId);
-    if (story?.userId !== user.id) throw new Error('Voce so pode excluir suas proprias cenas.');
+    if (story?.userId !== user.id) throw new Error('Você só pode excluir suas próprias cenas.');
 
     const { error } = await supabase.from('stories').delete().eq('id', storyId).eq('user_id', user.id);
     if (error) throw new Error(error.message);

@@ -84,7 +84,7 @@ export const LoginPage: React.FC = () => {
       }
       navigate('/home');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Nao foi possivel autenticar.';
+      const message = error instanceof Error ? error.message : 'Não foi possível autenticar.';
       if (message.includes('Confirme seu email')) {
         setSuccessMessage(message);
       } else {
@@ -102,9 +102,9 @@ export const LoginPage: React.FC = () => {
 
     try {
       await resendConfirmation(email);
-      setSuccessMessage('Email de confirmacao reenviado. Confira sua caixa de entrada.');
+      setSuccessMessage('E-mail de confirmação reenviado. Confira sua caixa de entrada.');
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : 'Nao foi possivel reenviar a confirmacao.');
+      setLocalError(error instanceof Error ? error.message : 'Não foi possível reenviar a confirmação.');
     } finally {
       setIsLoading(false);
     }
@@ -117,9 +117,9 @@ export const LoginPage: React.FC = () => {
 
     try {
       await requestPasswordReset(email);
-      setSuccessMessage('Enviamos um link para voce redefinir sua senha.');
+      setSuccessMessage('Enviamos um link para você redefinir sua senha.');
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : 'Nao foi possivel enviar a recuperacao de senha.');
+      setLocalError(error instanceof Error ? error.message : 'Não foi possível enviar a recuperação de senha.');
     } finally {
       setIsLoading(false);
     }
@@ -220,7 +220,7 @@ export const LoginPage: React.FC = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-300 ml-1">@ de usuario</label>
+                      <label className="text-sm font-medium text-gray-300 ml-1">@ de usuário</label>
                       <div className="relative">
                         <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500">@</span>
                         <input
@@ -320,7 +320,7 @@ export const LoginPage: React.FC = () => {
             disabled={isLoading || !email}
             className="mt-4 w-full text-sm text-gray-300 hover:text-white disabled:text-gray-600"
           >
-            Reenviar confirmacao de email
+            Reenviar confirmação de e-mail
           </button>
         )}
 
@@ -331,7 +331,7 @@ export const LoginPage: React.FC = () => {
             </button>
           ) : (
             <p className="text-gray-500 text-sm">
-              {mode === 'login' ? 'Nao tem uma conta?' : 'Ja tem uma conta?'}{' '}
+              {mode === 'login' ? 'Não tem uma conta?' : 'Já tem uma conta?'}{' '}
               <button
                 type="button"
                 onClick={() => changeMode(mode === 'login' ? 'signup' : 'login')}

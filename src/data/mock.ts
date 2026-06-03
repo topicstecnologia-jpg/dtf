@@ -180,7 +180,7 @@ export const MOCK_USERS: User[] = [
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
     coverUrl: 'https://images.unsplash.com/photo-1460723237483-7a6dc9d0b212?auto=format&fit=crop&w=800&q=80',
     bio: 'Cores, luzes e emoções intensas. O cinema é minha pintura favorita.',
-    emotionalProfile: 'Intenso Magnetico',
+    emotionalProfile: 'Intenso Magnético',
     likedMovies: ['5', '6', '1'],
     dislikedMovies: ['8'],
     favoriteMovies: ['5', '6'],
@@ -214,9 +214,9 @@ export const ONBOARDING_QUESTIONS: Question[] = [
     id: 'q1',
     text: 'O que mais te prende em uma historia de amor?',
     options: [
-      { text: 'Uma conexao bonita, sensivel e cheia de significado', value: 'elegant_dreamer' },
+      { text: 'Uma conexão bonita, sensível e cheia de significado', value: 'elegant_dreamer' },
       { text: 'Quimica forte, desejo e emocao no ar', value: 'magnetic_intense' },
-      { text: 'Cuidado, confianca e presenca constante', value: 'loyal_guardian' },
+      { text: 'Cuidado, confiança e presença constante', value: 'loyal_guardian' },
       { text: 'Leveza, espontaneidade e liberdade', value: 'free_soul' },
       { text: 'Detalhes, memorias e gestos simbolicos', value: 'nostalgic_heart' },
       { text: 'Planos, crescimento e futuro compartilhado', value: 'visionary_romantic' },
@@ -225,27 +225,27 @@ export const ONBOARDING_QUESTIONS: Question[] = [
   },
   {
     id: 'q2',
-    text: 'Qual clima combina mais com voce?',
+    text: 'Qual clima combina mais com você?',
     options: [
       { text: 'Um romance elegante, quase cinematografico', value: 'elegant_dreamer' },
       { text: 'Uma paixao que muda o ritmo de tudo', value: 'magnetic_intense' },
       { text: 'Um amor seguro, honesto e protetor', value: 'loyal_guardian' },
-      { text: 'Uma relacao natural, sem peso desnecessario', value: 'free_soul' },
+      { text: 'Uma relação natural, sem peso desnecessário', value: 'free_soul' },
       { text: 'Um encontro com cheiro de lembranca antiga', value: 'nostalgic_heart' },
       { text: 'Uma parceria que inspira uma vida maior', value: 'visionary_romantic' },
-      { text: 'Uma conexao rara, intensa e pouco obvia', value: 'mysterious_charm' }
+      { text: 'Uma conexão rara, intensa e pouco óbvia', value: 'mysterious_charm' }
     ]
   },
   {
     id: 'q3',
-    text: 'O que voce mais valoriza em uma conexao?',
+    text: 'O que você mais valoriza em uma conexão?',
     options: [
       { text: 'Profundidade emocional e beleza nos detalhes', value: 'elegant_dreamer' },
-      { text: 'Entrega, presenca e intensidade', value: 'magnetic_intense' },
+      { text: 'Entrega, presença e intensidade', value: 'magnetic_intense' },
       { text: 'Compromisso, lealdade e estabilidade', value: 'loyal_guardian' },
       { text: 'Individualidade, humor e fluidez', value: 'free_soul' },
       { text: 'Historia, memoria e pequenos rituais', value: 'nostalgic_heart' },
-      { text: 'Admiracao, ambicao e sonhos em comum', value: 'visionary_romantic' },
+      { text: 'Admiração, ambição e sonhos em comum', value: 'visionary_romantic' },
       { text: 'Profundidade seletiva e tensao emocional', value: 'mysterious_charm' }
     ]
   },
@@ -254,7 +254,7 @@ export const ONBOARDING_QUESTIONS: Question[] = [
     text: 'Escolha uma cena para sua historia ideal:',
     options: [
       { text: 'Um jantar bonito, luz baixa e conversa infinita', value: 'elegant_dreamer' },
-      { text: 'Uma pista cheia, olhares cruzados e coracao acelerado', value: 'magnetic_intense' },
+      { text: 'Uma pista cheia, olhares cruzados e coração acelerado', value: 'magnetic_intense' },
       { text: 'Uma casa tranquila onde os dois se sentem em paz', value: 'loyal_guardian' },
       { text: 'Uma viagem sem roteiro, rindo de tudo pelo caminho', value: 'free_soul' },
       { text: 'Uma carta guardada, uma musica antiga e saudade boa', value: 'nostalgic_heart' },

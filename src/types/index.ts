@@ -85,17 +85,17 @@ export interface Match {
 
 export type EmotionalProfileType = 
   | 'Sonhador Elegante'
-  | 'Intenso Magnetico'
-  | 'Guardiao Leal'
+  | 'Intenso Magnético'
+  | 'Guardião Leal'
   | 'Alma Livre'
-  | 'Coracao Nostalgico'
-  | 'Romantico Visionario'
+  | 'Coração Nostálgico'
+  | 'Romântico Visionário'
   | 'Encanto Misterioso'
-  | 'Romantico Idealista'
+  | 'Romântico Idealista'
   | 'Explorador Existencial'
-  | 'Amante de Historias Intensas'
-  | 'Sonhador Nostalgico'
-  | 'Coracao Dramatico';
+  | 'Amante de Histórias Intensas'
+  | 'Sonhador Nostálgico'
+  | 'Coração Dramático';
 
 export interface Question {
   id: string;

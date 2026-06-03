@@ -15,27 +15,27 @@ export const OnboardingPage: React.FC = () => {
   const [calculatedProfile, setCalculatedProfile] = useState<string>('Sonhador Elegante');
 
   const profileDescriptions: Record<string, string> = {
-    'Sonhador Elegante': 'Ama com idealizacao, sensibilidade e romantismo. Busca uma conexao bonita, profunda e cheia de significado.',
-    'Intenso Magnetico': 'Vive o amor com paixao, presenca e entrega. E atraido por conexoes fortes, cheias de quimica, desejo e emocao.',
-    'Guardiao Leal': 'Ama com constancia, cuidado e protecao. Valoriza confianca, compromisso e seguranca emocional.',
-    'Alma Livre': 'Se conecta pela leveza, espontaneidade e liberdade. Prefere relacoes naturais, onde o amor flui sem perder a individualidade.',
-    'Coracao Nostalgico': 'Ama com memoria, detalhe e profundidade emocional. Valoriza gestos simbolicos, lembrancas especiais e clima de filme antigo.',
-    'Romantico Visionario': 'Enxerga o amor como parceria de futuro. Busca crescimento, sonhos compartilhados e uma vida construida a dois.',
-    'Encanto Misterioso': 'Ama de forma profunda, seletiva e envolvente. Gosta de conexoes que despertam curiosidade e descoberta aos poucos.'
+    'Sonhador Elegante': 'Ama com idealização, sensibilidade e romantismo. Busca uma conexão bonita, profunda e cheia de significado.',
+    'Intenso Magnético': 'Vive o amor com paixão, presença e entrega. É atraído por conexões fortes, cheias de química, desejo e emoção.',
+    'Guardião Leal': 'Ama com constância, cuidado e proteção. Valoriza confiança, compromisso e segurança emocional.',
+    'Alma Livre': 'Se conecta pela leveza, espontaneidade e liberdade. Prefere relações naturais, onde o amor flui sem perder a individualidade.',
+    'Coração Nostálgico': 'Ama com memória, detalhe e profundidade emocional. Valoriza gestos simbólicos, lembranças especiais e clima de filme antigo.',
+    'Romântico Visionário': 'Enxerga o amor como parceria de futuro. Busca crescimento, sonhos compartilhados e uma vida construída a dois.',
+    'Encanto Misterioso': 'Ama de forma profunda, seletiva e envolvente. Gosta de conexões que despertam curiosidade e descoberta aos poucos.'
   };
 
   const loveTypeByTrait: Record<string, string> = {
     elegant_dreamer: 'Sonhador Elegante',
-    magnetic_intense: 'Intenso Magnetico',
-    loyal_guardian: 'Guardiao Leal',
+    magnetic_intense: 'Intenso Magnético',
+    loyal_guardian: 'Guardião Leal',
     free_soul: 'Alma Livre',
-    nostalgic_heart: 'Coracao Nostalgico',
-    visionary_romantic: 'Romantico Visionario',
+    nostalgic_heart: 'Coração Nostálgico',
+    visionary_romantic: 'Romântico Visionário',
     mysterious_charm: 'Encanto Misterioso',
     romantic: 'Sonhador Elegante',
-    intense: 'Intenso Magnetico',
-    dreamer: 'Coracao Nostalgico',
-    dramatic: 'Intenso Magnetico',
+    intense: 'Intenso Magnético',
+    dreamer: 'Coração Nostálgico',
+    dramatic: 'Intenso Magnético',
     existential: 'Encanto Misterioso'
   };
 
@@ -160,7 +160,7 @@ export const OnboardingPage: React.FC = () => {
   const renderMovies = () => (
     <div className="flex flex-col h-full items-center justify-center p-6 relative max-w-md mx-auto w-full">
       <h2 className="text-2xl font-bold text-white mb-12 text-center absolute top-12 z-10">
-        Filmes que combinam<br />com voce
+        Filmes que combinam<br />com você
       </h2>
 
       <div className="relative w-full max-w-[280px] aspect-[2/3] flex items-center justify-center" style={{ perspective: '1200px' }}>
@@ -180,12 +180,12 @@ export const OnboardingPage: React.FC = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 w-full">
         <div>
           <h2 className="text-4xl font-display font-bold text-white mb-2">Deu Match!</h2>
-          <p className="text-gray-400">Usuarios cadastrados que combinam com voce</p>
+          <p className="text-gray-400">Usuários cadastrados que combinam com você</p>
         </div>
 
         <div className="flex justify-center space-x-4 py-8">
           {matchedUsers.length === 0 ? (
-            <p className="text-gray-500 text-sm">Ainda nao ha outros usuarios cadastrados.</p>
+            <p className="text-gray-500 text-sm">Ainda não há outros usuários cadastrados.</p>
           ) : matchedUsers.map((matchedUser, index) => (
             <motion.div
               key={matchedUser.id}

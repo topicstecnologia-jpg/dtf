@@ -37,7 +37,7 @@ export const ResetPasswordPage: React.FC = () => {
       setSuccessMessage('Senha atualizada com sucesso.');
       setTimeout(() => navigate('/home'), 900);
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : 'Nao foi possivel atualizar a senha.');
+      setLocalError(error instanceof Error ? error.message : 'Não foi possível atualizar a senha.');
     } finally {
       setIsLoading(false);
     }

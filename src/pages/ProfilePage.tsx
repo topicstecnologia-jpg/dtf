@@ -38,7 +38,7 @@ export const ProfilePage: React.FC = () => {
       ? profileUsers.find(profile => profile.handle.toLowerCase() === decodedParam.toLowerCase())
       : getUserById(userId);
 
-  if (!profileUser) return <div className="p-8 text-center text-white bg-black min-h-screen">Usuario nao encontrado</div>;
+  if (!profileUser) return <div className="p-8 text-center text-white bg-black min-h-screen">Usuário não encontrado</div>;
 
   const match = matches.find(m =>
     m.userIds.includes(currentUser?.id || '') &&
@@ -61,13 +61,23 @@ export const ProfilePage: React.FC = () => {
   const liveContentUser = liveOriginalPost ? getUserById(liveOriginalPost.userId) : profileUser;
   const favoriteMovies = (profileUser.favoriteMovies || []).map(id => MOVIES.find(m => m.id === id)).filter(Boolean);
   const loveTypeDescriptions: Record<string, string> = {
-    'Sonhador Elegante': 'Conexao bonita, profunda e cheia de significado.',
-    'Intenso Magnetico': 'Paixao, presenca, quimica e entrega.',
-    'Guardiao Leal': 'Cuidado, compromisso e seguranca emocional.',
+    'Sonhador Elegante': 'Conexão bonita, profunda e cheia de significado.',
+    'Intenso Magnetico': 'Paixão, presença, química e entrega.',
+    'Intenso Magnético': 'Paixão, presença, química e entrega.',
+    'Guardiao Leal': 'Cuidado, compromisso e segurança emocional.',
+    'Guardião Leal': 'Cuidado, compromisso e segurança emocional.',
     'Alma Livre': 'Leveza, espontaneidade e liberdade.',
-    'Coracao Nostalgico': 'Memoria, detalhes e gestos simbolicos.',
+    'Coracao Nostalgico': 'Memória, detalhes e gestos simbólicos.',
+    'Coração Nostálgico': 'Memória, detalhes e gestos simbólicos.',
     'Romantico Visionario': 'Parceria, futuro e sonhos compartilhados.',
+    'Romântico Visionário': 'Parceria, futuro e sonhos compartilhados.',
     'Encanto Misterioso': 'Profundidade, seletividade e descoberta aos poucos.'
+  };
+  const loveTypeLabels: Record<string, string> = {
+    'Intenso Magnetico': 'Intenso Magnético',
+    'Guardiao Leal': 'Guardião Leal',
+    'Coracao Nostalgico': 'Coração Nostálgico',
+    'Romantico Visionario': 'Romântico Visionário'
   };
 
   const filteredPosts = posts.filter(post => {
@@ -132,14 +142,14 @@ export const ProfilePage: React.FC = () => {
       }
       setAvatarFile(null);
     } catch (error) {
-      setEditError(error instanceof Error ? error.message : 'Nao foi possivel salvar o perfil.');
+      setEditError(error instanceof Error ? error.message : 'Não foi possível salvar o perfil.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm('Tem certeza que deseja excluir sua conta? Essa acao nao pode ser desfeita.');
+    const confirmed = window.confirm('Tem certeza que deseja excluir sua conta? Essa ação não pode ser desfeita.');
     if (!confirmed) return;
 
     setIsSaving(true);
@@ -149,7 +159,7 @@ export const ProfilePage: React.FC = () => {
       await deleteAccount();
       navigate('/');
     } catch (error) {
-      setEditError(error instanceof Error ? error.message : 'Nao foi possivel excluir sua conta.');
+      setEditError(error instanceof Error ? error.message : 'Não foi possível excluir sua conta.');
       setIsSaving(false);
     }
   };
@@ -174,7 +184,7 @@ export const ProfilePage: React.FC = () => {
       setIsEditingPost(false);
       setIsPostMenuOpen(false);
     } catch (error) {
-      setPostActionError(error instanceof Error ? error.message : 'Nao foi possivel editar a postagem.');
+      setPostActionError(error instanceof Error ? error.message : 'Não foi possível editar a postagem.');
     } finally {
       setIsSavingPost(false);
     }
@@ -182,7 +192,7 @@ export const ProfilePage: React.FC = () => {
 
   const handleDeletePost = async () => {
     if (!liveSelectedPost) return;
-    const confirmed = window.confirm('Excluir esta postagem? Essa acao nao pode ser desfeita.');
+    const confirmed = window.confirm('Excluir esta postagem? Essa ação não pode ser desfeita.');
     if (!confirmed) return;
 
     setIsSavingPost(true);
@@ -194,7 +204,7 @@ export const ProfilePage: React.FC = () => {
       setIsPostMenuOpen(false);
       setIsEditingPost(false);
     } catch (error) {
-      setPostActionError(error instanceof Error ? error.message : 'Nao foi possivel excluir a postagem.');
+      setPostActionError(error instanceof Error ? error.message : 'Não foi possível excluir a postagem.');
     } finally {
       setIsSavingPost(false);
     }
@@ -307,12 +317,12 @@ export const ProfilePage: React.FC = () => {
 
         <div className="text-center max-w-sm mb-3">
           <p className="text-sm leading-relaxed mb-2">
-            {profileUser.bio || 'Sem bio disponivel.'}
+            {profileUser.bio || 'Sem bio disponível.'}
           </p>
           {profileUser.emotionalProfile && (
             <div className="mb-3 rounded-2xl border border-[#3F1521]/40 bg-[#3F1521]/15 px-4 py-3 text-left">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#E4B5C2]">Tipo de amor</p>
-              <p className="mt-1 text-sm font-bold text-white">{profileUser.emotionalProfile}</p>
+              <p className="mt-1 text-sm font-bold text-white">{loveTypeLabels[profileUser.emotionalProfile] || profileUser.emotionalProfile}</p>
               <p className="mt-1 text-xs leading-relaxed text-zinc-400">
                 {loveTypeDescriptions[profileUser.emotionalProfile] || 'Um jeito unico de viver conexoes.'}
               </p>
@@ -429,7 +439,7 @@ export const ProfilePage: React.FC = () => {
             {filteredPosts.length === 0 && (
               <div className="col-span-3 py-16 text-center text-zinc-500">
                 <Grid size={42} className="mx-auto mb-4 opacity-20" />
-                <p>Nenhuma publicacao encontrada.</p>
+                <p>Nenhuma publicação encontrada.</p>
               </div>
             )}
           </>
@@ -516,7 +526,7 @@ export const ProfilePage: React.FC = () => {
               <div className="mx-5 mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-xs text-zinc-500">Perfil original</p>
-                  <p className="truncate text-sm font-bold text-white">{liveContentUser?.handle || 'Publicacao original'}</p>
+                  <p className="truncate text-sm font-bold text-white">{liveContentUser?.handle || 'Publicação original'}</p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-zinc-400">
                   <span>republicado por:</span>
@@ -604,7 +614,7 @@ export const ProfilePage: React.FC = () => {
             <div className="max-h-[65vh] overflow-y-auto p-3">
               {socialProfiles.length === 0 ? (
                 <p className="py-12 text-center text-sm text-zinc-500">
-                  {socialList === 'following' ? 'Ainda nao segue ninguem.' : 'Ainda nao ha seguidores.'}
+                  {socialList === 'following' ? 'Ainda não segue ninguém.' : 'Ainda não há seguidores.'}
                 </p>
               ) : (
                 socialProfiles.map(profile => (
@@ -682,7 +692,7 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300 ml-1">Nome de usuario</label>
+                <label className="text-sm font-medium text-gray-300 ml-1">Nome de usuário</label>
                 <div className="relative">
                   <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-500">@</span>
                   <input
@@ -711,7 +721,7 @@ export const ProfilePage: React.FC = () => {
                   value={editBio}
                   onChange={(event) => setEditBio(event.target.value)}
                   className="w-full min-h-28 rounded-3xl bg-[#17171B] border border-white/10 py-4 px-5 text-white outline-none focus:border-white/25 resize-none"
-                  placeholder="Conte um pouco sobre voce"
+                  placeholder="Conte um pouco sobre você"
                   maxLength={220}
                 />
               </div>

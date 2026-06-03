@@ -21,7 +21,7 @@ export const normalizeHandle = (value: string) => {
 };
 
 export const createDefaultProfile = (id: string, email?: string, name?: string, handle?: string): User => {
-  const displayName = name?.trim() || email?.split('@')[0] || 'Usuario';
+  const displayName = name?.trim() || email?.split('@')[0] || 'Usuário';
   const normalizedHandle = normalizeHandle(handle || displayName);
 
   return {
@@ -51,7 +51,7 @@ export const createDefaultProfile = (id: string, email?: string, name?: string, 
 
 export const mapProfileRowToUser = (row: any): User => ({
   id: row.id,
-  name: row.name || 'Usuario',
+  name: row.name || 'Usuário',
   handle: row.handle || '@usuario',
   usernameConfigured: row.username_configured ?? Boolean(row.handle && row.handle !== '@usuario'),
   onboardingCompleted: Boolean(row.onboarding_completed || row.emotional_profile),

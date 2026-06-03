@@ -124,7 +124,7 @@ export const MatchesPage: React.FC = () => {
                     <p className="text-sm text-gray-500 truncate">
                       <span className="font-semibold text-gray-700">{otherUser.handle}</span>
                       <span className="mx-1">.</span>
-                      {lastMessage?.text || (lastMessage?.mediaType === 'audio' ? 'Audio' : lastMessage?.mediaType ? 'Midia' : 'Voces deram match! Diga oi.')}
+                      {lastMessage?.text || (lastMessage?.mediaType === 'audio' ? 'Áudio' : lastMessage?.mediaType ? 'Mídia' : 'Vocês deram match! Diga oi.')}
                     </p>
                   </div>
 
