@@ -273,18 +273,21 @@ export const MOCK_CHATS: Chat[] = [
         id: 'msg1',
         senderId: 'u2',
         text: 'Oi! Vi que você também gosta de Her. Que filme incrível, né?',
+        reactions: [],
         timestamp: Date.now() - 1000 * 60 * 60 * 24,
       },
       {
         id: 'msg2',
         senderId: 'u1',
         text: 'Sim! A fotografia é maravilhosa. E a trilha sonora também.',
+        reactions: [],
         timestamp: Date.now() - 1000 * 60 * 60 * 23,
       },
       {
         id: 'msg3',
         senderId: 'u2',
         text: 'Totalmente! Aquela cena na praia é de chorar.',
+        reactions: [],
         timestamp: Date.now() - 1000 * 60 * 60 * 22,
       }
     ]

@@ -112,6 +112,10 @@ export interface Message {
   text?: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'video' | 'audio';
+  reactions: {
+    userId: string;
+    emoji: string;
+  }[];
   timestamp: number;
 }
 

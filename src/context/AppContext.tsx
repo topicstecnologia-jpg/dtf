@@ -43,6 +43,7 @@ interface AppContextType {
   getRecommendedMovies: (mood: string) => Movie[];
   sendMessage: (matchId: string, text?: string, media?: { url: string, type: 'image' | 'video' | 'audio' }) => Promise<void>;
   sendMediaMessage: (matchId: string, file: File | Blob, type: 'image' | 'video' | 'audio') => Promise<void>;
+  toggleMessageReaction: (messageId: string, emoji: string) => Promise<void>;
   startChat: (targetUserId: string) => Promise<string>;
   addComment: (postId: string, text: string) => Promise<void>;
   toggleSavePost: (postId: string) => Promise<void>;
@@ -161,7 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loadMessages = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
+    const { data } = await supabase.from('messages').select('*, message_reactions(user_id, emoji)').order('created_at', { ascending: true });
     const grouped = new Map<string, Message[]>();
 
     (data || []).forEach(row => {
@@ -172,6 +173,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         text: row.text || undefined,
         mediaUrl: row.media_url || undefined,
         mediaType: row.media_type || undefined,
+        reactions: (row.message_reactions || []).map((reaction: any) => ({
+          userId: reaction.user_id,
+          emoji: reaction.emoji
+        })),
         timestamp: new Date(row.created_at).getTime()
       });
       grouped.set(row.match_id, messagesForMatch);
@@ -417,6 +422,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const patchMessageReaction = (messageId: string, userId: string, emoji?: string) => {
+    setChats(prevChats => prevChats.map(chat => ({
+      ...chat,
+      messages: chat.messages.map(message => {
+        if (message.id !== messageId) return message;
+        const otherReactions = message.reactions.filter(reaction => reaction.userId !== userId);
+        return {
+          ...message,
+          reactions: emoji ? [...otherReactions, { userId, emoji }] : otherReactions
+        };
+      })
+    })));
+  };
+
   const appendPost = (post: Post) => {
     setPosts(prevPosts => (
       prevPosts.some(item => item.id === post.id) ? prevPosts : [post, ...prevPosts]
@@ -544,8 +563,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             text: row.text || undefined,
             mediaUrl: row.media_url || undefined,
             mediaType: row.media_type || undefined,
+            reactions: [],
             timestamp: new Date(row.created_at).getTime()
           });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          const row = payload.new as any;
+          patchMessageReaction(row.message_id, row.user_id, row.emoji);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          const row = payload.new as any;
+          patchMessageReaction(row.message_id, row.user_id, row.emoji);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'message_reactions' },
+        (payload) => {
+          const row = payload.old as any;
+          patchMessageReaction(row.message_id, row.user_id);
         }
       )
       .subscribe();
@@ -1307,10 +1351,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       text,
       mediaUrl: media?.url,
       mediaType: media?.type,
+      reactions: [],
       timestamp: new Date(data.created_at).getTime()
     };
 
     appendMessageToChat(matchId, newMessage);
+  };
+
+  const toggleMessageReaction = async (messageId: string, emoji: string) => {
+    if (!user || !supabase) return;
+
+    const message = chats.flatMap(chat => chat.messages).find(item => item.id === messageId);
+    if (!message) return;
+
+    const currentReaction = message.reactions.find(reaction => reaction.userId === user.id);
+
+    if (currentReaction?.emoji === emoji) {
+      const { error } = await supabase
+        .from('message_reactions')
+        .delete()
+        .eq('message_id', messageId)
+        .eq('user_id', user.id);
+
+      if (error) throw new Error(error.message);
+      patchMessageReaction(messageId, user.id);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('message_reactions')
+      .upsert({
+        message_id: messageId,
+        user_id: user.id,
+        emoji
+      }, { onConflict: 'message_id,user_id' });
+
+    if (error) throw new Error(error.message);
+    patchMessageReaction(messageId, user.id, emoji);
   };
 
   const sendMediaMessage = async (matchId: string, file: File | Blob, type: 'image' | 'video' | 'audio') => {
@@ -1464,6 +1541,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     getRecommendedMovies,
     sendMessage,
     sendMediaMessage,
+    toggleMessageReaction,
     startChat,
     addComment,
     toggleSavePost,

@@ -13,7 +13,8 @@ import {
   Paperclip,
   X,
   Download,
-  Square
+  Square,
+  SmilePlus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -27,15 +28,18 @@ type SharedPostPayload = {
   thumbnailUrl?: string;
 };
 
+const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
+
 export const ChatPage: React.FC = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
-  const { user, chats, sendMessage, sendMediaMessage, matches, posts, getUserById, markChatRead, isUserOnline } = useApp();
+  const { user, chats, sendMessage, sendMediaMessage, toggleMessageReaction, matches, posts, getUserById, markChatRead, isUserOnline } = useApp();
   const [inputText, setInputText] = useState('');
   const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingError, setRecordingError] = useState('');
   const [isSendingMedia, setIsSendingMedia] = useState(false);
+  const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -47,6 +51,18 @@ export const ChatPage: React.FC = () => {
   const chat = chats.find(c => c.matchId === matchId);
   const messages = chat?.messages || [];
   const otherUserOnline = isUserOnline(otherUserId);
+
+  const getReactionGroups = (reactions: { userId: string; emoji: string }[]) => (
+    Object.entries(reactions.reduce<Record<string, string[]>>((groups, reaction) => {
+      groups[reaction.emoji] = [...(groups[reaction.emoji] || []), reaction.userId];
+      return groups;
+    }, {}))
+  );
+
+  const handleReaction = async (messageId: string, emoji: string) => {
+    await toggleMessageReaction(messageId, emoji);
+    setReactionMessageId(null);
+  };
 
   const getSharedPostFromText = (text?: string): SharedPostPayload | null => {
     if (!text) return null;
@@ -239,25 +255,57 @@ export const ChatPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="h-full overflow-y-auto px-4 pt-24 pb-28 space-y-4 bg-[#17171B] scrollbar-hide overscroll-none">
+      <div className="h-full overflow-y-auto px-4 pt-24 pb-28 space-y-7 bg-[#17171B] scrollbar-hide overscroll-none">
         {messages.map((msg) => {
           const isMe = msg.senderId === user?.id;
           const sharedPost = getSharedPostFromText(msg.text);
+          const reactionGroups = getReactionGroups(msg.reactions || []);
           return (
             <motion.div
               key={msg.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+              className={`group flex ${isMe ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${
+                className={`relative max-w-[78%] rounded-2xl px-4 py-3 shadow-sm ${
                   isMe
                     ? 'bg-[#3F1521] text-white rounded-br-none'
                     : 'bg-[#2A2A30] text-gray-200 rounded-bl-none'
                 }`}
+                onDoubleClick={() => setReactionMessageId(msg.id)}
                 style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}
               >
+                <button
+                  type="button"
+                  onClick={() => setReactionMessageId(prev => prev === msg.id ? null : msg.id)}
+                  className={`absolute top-1/2 -translate-y-1/2 rounded-full bg-black/35 p-1.5 text-white/70 opacity-0 transition-opacity hover:text-white group-hover:opacity-100 ${
+                    isMe ? '-left-10' : '-right-10'
+                  }`}
+                  aria-label="Reagir a mensagem"
+                >
+                  <SmilePlus size={16} />
+                </button>
+
+                {reactionMessageId === msg.id && (
+                  <div
+                    className={`absolute -top-12 z-30 flex items-center gap-1 rounded-full border border-white/10 bg-[#101014] px-2 py-1.5 shadow-2xl ${
+                      isMe ? 'right-0' : 'left-0'
+                    }`}
+                  >
+                    {REACTION_EMOJIS.map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => handleReaction(msg.id, emoji)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-lg hover:bg-white/10"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {msg.mediaUrl && (
                   <div className="mb-2 rounded-lg overflow-hidden">
                     {msg.mediaType === 'image' && (
@@ -328,6 +376,27 @@ export const ChatPage: React.FC = () => {
                 <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-white/50' : 'text-gray-500'}`}>
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
+                {reactionGroups.length > 0 && (
+                  <div className={`absolute -bottom-5 flex gap-1 ${isMe ? 'right-2' : 'left-2'}`}>
+                    {reactionGroups.map(([emoji, userIds]) => {
+                      const reactedByMe = userIds.includes(user?.id || '');
+                      return (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleReaction(msg.id, emoji)}
+                          className={`rounded-full border px-1.5 py-0.5 text-xs shadow-sm ${
+                            reactedByMe
+                              ? 'border-white/40 bg-white text-black'
+                              : 'border-white/10 bg-[#101014] text-white'
+                          }`}
+                        >
+                          {emoji}{userIds.length > 1 ? ` ${userIds.length}` : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </motion.div>
           );

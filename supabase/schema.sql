@@ -42,6 +42,14 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.message_reactions (
+  message_id uuid not null references public.messages(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  emoji text not null,
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
 create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -303,6 +311,18 @@ begin
       from pg_publication_tables
       where pubname = 'supabase_realtime'
       and schemaname = 'public'
+      and tablename = 'message_reactions'
+    )
+  then
+    alter publication supabase_realtime add table public.message_reactions;
+  end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
       and tablename = 'posts'
     )
   then
@@ -428,6 +448,7 @@ create trigger on_auth_user_created
 alter table public.profiles enable row level security;
 alter table public.matches enable row level security;
 alter table public.messages enable row level security;
+alter table public.message_reactions enable row level security;
 alter table public.posts enable row level security;
 alter table public.stories enable row level security;
 alter table public.comments enable row level security;
@@ -497,6 +518,47 @@ create policy "Users can send messages in their matches"
       and (matches.user_a = auth.uid() or matches.user_b = auth.uid())
     )
   );
+
+drop policy if exists "Users can read reactions in their matches" on public.message_reactions;
+create policy "Users can read reactions in their matches"
+  on public.message_reactions for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.messages
+      join public.matches on matches.id = messages.match_id
+      where messages.id = message_reactions.message_id
+      and (matches.user_a = auth.uid() or matches.user_b = auth.uid())
+    )
+  );
+
+drop policy if exists "Users can react in their matches" on public.message_reactions;
+create policy "Users can react in their matches"
+  on public.message_reactions for insert
+  to authenticated
+  with check (
+    auth.uid() = user_id and exists (
+      select 1
+      from public.messages
+      join public.matches on matches.id = messages.match_id
+      where messages.id = message_reactions.message_id
+      and (matches.user_a = auth.uid() or matches.user_b = auth.uid())
+    )
+  );
+
+drop policy if exists "Users can update their message reactions" on public.message_reactions;
+create policy "Users can update their message reactions"
+  on public.message_reactions for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can remove their message reactions" on public.message_reactions;
+create policy "Users can remove their message reactions"
+  on public.message_reactions for delete
+  to authenticated
+  using (auth.uid() = user_id);
 
 drop policy if exists "Posts are visible to authenticated users" on public.posts;
 create policy "Posts are visible to authenticated users"
