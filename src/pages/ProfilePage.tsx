@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { MOVIES } from '../data/mock';
-import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2, MoreHorizontal, Star, Info } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Grid, Play, Repeat, Heart, Share2, Bell, UserPlus, ChevronDown, Camera, X, Image as ImageIcon, Trash2, MoreHorizontal, Star, Info, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Post } from '../types';
 
@@ -34,6 +34,8 @@ export const ProfilePage: React.FC = () => {
   const [favoriteError, setFavoriteError] = useState('');
   const [isSavingFavorites, setIsSavingFavorites] = useState(false);
   const [isLoveTypeOpen, setIsLoveTypeOpen] = useState(false);
+  const [favoriteSearch, setFavoriteSearch] = useState('');
+  const [selectedMovieInfo, setSelectedMovieInfo] = useState<typeof MOVIES[number] | null>(null);
 
   const decodedParam = userId ? decodeURIComponent(userId) : '';
   const isCurrentUser = !userId || userId === currentUser?.id || decodedParam.toLowerCase() === currentUser?.handle?.toLowerCase();
@@ -66,6 +68,13 @@ export const ProfilePage: React.FC = () => {
   const liveContentUser = liveOriginalPost ? getUserById(liveOriginalPost.userId) : profileUser;
   const favoriteMovies = (profileUser.favoriteMovies || []).map(id => MOVIES.find(m => m.id === id)).filter(Boolean);
   const topFavoriteMovie = favoriteMovies[0];
+  const favoriteSearchTerm = favoriteSearch.trim().toLowerCase();
+  const filteredFavoriteOptions = favoriteSearchTerm
+    ? MOVIES.filter(movie => (
+      movie.title.toLowerCase().includes(favoriteSearchTerm) ||
+      movie.genres.some(genre => genre.toLowerCase().includes(favoriteSearchTerm))
+    ))
+    : MOVIES;
   const loveTypeDescriptions: Record<string, string> = {
     'Sonhador Elegante': 'Conexão bonita, profunda e cheia de significado.',
     'Intenso Magnetico': 'Paixão, presença, química e entrega.',
@@ -116,6 +125,7 @@ export const ProfilePage: React.FC = () => {
   const openFavoriteEditor = () => {
     setSelectedFavoriteIds(profileUser.favoriteMovies || []);
     setFavoriteError('');
+    setFavoriteSearch('');
     setIsEditingFavorites(true);
   };
 
@@ -435,7 +445,12 @@ export const ProfilePage: React.FC = () => {
             )}
             {favoriteMovies.length > 0 ? (
               favoriteMovies.map((movie, index) => (
-                <div key={movie?.id} className="aspect-[2/3] bg-zinc-900 relative overflow-hidden">
+                <button
+                  key={movie?.id}
+                  type="button"
+                  onClick={() => movie && setSelectedMovieInfo(movie)}
+                  className="aspect-[2/3] bg-zinc-900 relative overflow-hidden text-left"
+                >
                   <img
                     src={movie?.posterUrl}
                     alt={movie?.title}
@@ -448,7 +463,7 @@ export const ProfilePage: React.FC = () => {
                     <span className="text-xs font-bold truncate">{movie?.title}</span>
                     <span className="text-[10px] text-gray-300">{movie?.year}</span>
                   </div>
-                </div>
+                </button>
               ))
             ) : (
               <div className="col-span-3 py-16 text-center text-zinc-500">
@@ -785,8 +800,22 @@ export const ProfilePage: React.FC = () => {
               </div>
             )}
 
+            <div className="border-b border-white/10 p-4">
+              <div className="relative">
+                <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  value={favoriteSearch}
+                  onChange={(event) => setFavoriteSearch(event.target.value)}
+                  className="w-full h-12 rounded-full bg-[#222226] border border-white/10 pl-11 pr-4 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-white/25"
+                  placeholder="Pesquisar filme pelo nome"
+                />
+              </div>
+            </div>
+
             <div className="max-h-[48vh] overflow-y-auto p-3">
-              {MOVIES.map(movie => {
+              {filteredFavoriteOptions.length === 0 ? (
+                <p className="py-10 text-center text-sm text-zinc-500">Nenhum filme encontrado.</p>
+              ) : filteredFavoriteOptions.map(movie => {
                 const selectedIndex = selectedFavoriteIds.indexOf(movie.id);
                 const isSelected = selectedIndex >= 0;
                 const isDisabled = !isSelected && selectedFavoriteIds.length >= 5;
@@ -824,6 +853,49 @@ export const ProfilePage: React.FC = () => {
               >
                 {isSavingFavorites ? 'Salvando...' : 'Salvar ranking'}
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {selectedMovieInfo && (
+        <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-5">
+          <motion.div
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="w-full max-w-md overflow-hidden rounded-t-[32px] md:rounded-[28px] border border-white/10 bg-[#17171B] shadow-2xl"
+          >
+            <div className="relative aspect-[16/10] bg-zinc-900">
+              <img
+                src={selectedMovieInfo.posterUrl}
+                alt={selectedMovieInfo.title}
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#17171B] via-black/35 to-transparent" />
+              <button
+                type="button"
+                onClick={() => setSelectedMovieInfo(null)}
+                className="absolute right-4 top-4 rounded-full bg-black/45 p-2 text-white backdrop-blur-md"
+              >
+                <X size={20} />
+              </button>
+              <div className="absolute bottom-4 left-4 right-4">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">Filme favorito</p>
+                <h2 className="mt-1 text-2xl font-bold text-white">{selectedMovieInfo.title}</h2>
+                <p className="mt-1 text-sm text-white/70">{selectedMovieInfo.year} • {selectedMovieInfo.genres.join(', ')}</p>
+              </div>
+            </div>
+            <div className="p-5">
+              <p className="text-sm leading-relaxed text-zinc-300">{selectedMovieInfo.description}</p>
+              {selectedMovieInfo.platforms.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {selectedMovieInfo.platforms.map(platform => (
+                    <span key={platform} className="rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-zinc-300">
+                      {platform}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
