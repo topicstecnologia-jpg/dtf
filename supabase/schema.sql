@@ -159,8 +159,12 @@ create table if not exists public.community_messages (
   user_id uuid references public.profiles(id) on delete set null,
   text text not null,
   type text not null default 'message' check (type in ('message', 'system')),
+  expires_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.community_messages
+  add column if not exists expires_at timestamptz;
 
 alter table public.profiles
   add column if not exists username_configured boolean not null default false;
@@ -854,7 +858,7 @@ values (
   'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80',
   'https://i.postimg.cc/GpHmXR5D/Design-sem-nome.png',
   '{"cineLive":true,"groups":true,"posts":true,"cineLiveUrl":"https://www.youtube.com/"}'::jsonb,
-  '[{"id":"cineclub-geral","name":"Geral"},{"id":"cineclub-romance","name":"Romances"},{"id":"cineclub-sessao","name":"Sessão ao vivo"}]'::jsonb
+  '[{"id":"cineclub-geral","name":"Geral","coverUrl":"https://images.unsplash.com/photo-1512070679279-8988d32161be?auto=format&fit=crop&w=800&q=80"},{"id":"cineclub-romance","name":"Romances","coverUrl":"https://images.unsplash.com/photo-1516585427167-9f4af9627e6c?auto=format&fit=crop&w=800&q=80"},{"id":"cineclub-sessao","name":"Sessão ao vivo","coverUrl":"https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=800&q=80"}]'::jsonb
 )
 on conflict (id) do update set
   name = excluded.name,
@@ -889,6 +893,12 @@ create policy "Directors can update their communities"
   to authenticated
   using (auth.uid() = owner_id)
   with check (auth.uid() = owner_id);
+
+drop policy if exists "Directors can delete their communities" on public.communities;
+create policy "Directors can delete their communities"
+  on public.communities for delete
+  to authenticated
+  using (auth.uid() = owner_id);
 
 drop policy if exists "Community members are visible to authenticated users" on public.community_members;
 create policy "Community members are visible to authenticated users"

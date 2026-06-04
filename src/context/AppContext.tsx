@@ -39,6 +39,7 @@ interface AppContextType {
     avatarFile?: File | null;
     features: Community['features'];
     groups: string[];
+    groupCoverFiles?: (File | null)[];
   }) => Promise<void>;
   joinCommunity: (communityId: string) => Promise<void>;
   createCommunityPost: (communityId: string, values: { text: string; imageFile?: File | null }) => Promise<void>;
@@ -50,7 +51,9 @@ interface AppContextType {
     avatarFile?: File | null;
     features: Community['features'];
     groups: string[];
+    groupCoverFiles?: (File | null)[];
   }) => Promise<void>;
+  deleteCommunity: (communityId: string) => Promise<void>;
   sendCommunityMessage: (communityId: string, roomId: string, text: string) => Promise<void>;
   enterCommunityRoom: (communityId: string, roomId: string) => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
@@ -167,9 +170,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cineLiveUrl: 'https://www.youtube.com/'
     },
     groups: [
-      { id: 'cineclub-geral', name: 'Geral' },
-      { id: 'cineclub-romance', name: 'Romances' },
-      { id: 'cineclub-sessao', name: 'Sessão ao vivo' }
+      { id: 'cineclub-geral', name: 'Geral', coverUrl: 'https://images.unsplash.com/photo-1512070679279-8988d32161be?auto=format&fit=crop&w=800&q=80' },
+      { id: 'cineclub-romance', name: 'Romances', coverUrl: 'https://images.unsplash.com/photo-1516585427167-9f4af9627e6c?auto=format&fit=crop&w=800&q=80' },
+      { id: 'cineclub-sessao', name: 'Sessão ao vivo', coverUrl: 'https://images.unsplash.com/photo-1524985069026-dd778a71c7b4?auto=format&fit=crop&w=800&q=80' }
     ],
     memberIds: user ? [user.id] : [],
     posts: [],
@@ -319,7 +322,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     userId: row.user_id || undefined,
     text: row.text || '',
     type: row.type || 'message',
-    timestamp: new Date(row.created_at).getTime()
+    timestamp: new Date(row.created_at).getTime(),
+    expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : undefined
   });
 
   const mapCommunityRow = (row: any): Community => ({
@@ -338,7 +342,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     groups: row.groups || [],
     memberIds: (row.community_members || []).map((member: any) => member.user_id),
     posts: (row.community_posts || []).map(mapCommunityPostRow),
-    messages: (row.community_messages || []).map(mapCommunityMessageRow),
+    messages: (row.community_messages || [])
+      .map(mapCommunityMessageRow)
+      .filter((message: CommunityMessage) => message.roomId !== 'cine-live' || !message.expiresAt || message.expiresAt > Date.now()),
     createdAt: new Date(row.created_at).getTime()
   });
 
@@ -1173,6 +1179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     avatarFile?: File | null;
     features: Community['features'];
     groups: string[];
+    groupCoverFiles?: (File | null)[];
   }) => {
     if (!user || !supabase) return;
     if (!user.directorEligible) throw new Error('Você precisa se tornar Diretor para criar uma comunidade.');
@@ -1183,8 +1190,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const coverUrl = values.coverFile ? await uploadCommunityImage(values.coverFile, 'cover') : '';
     const avatarUrl = values.avatarFile ? await uploadCommunityImage(values.avatarFile, 'avatar') : '';
+    const groupCoverUrls = await Promise.all((values.groupCoverFiles || []).slice(0, 3).map((file, index) => (
+      file ? uploadCommunityImage(file, `group-${index + 1}`) : Promise.resolve('')
+    )));
     const groups = values.features.groups
-      ? values.groups.filter(Boolean).slice(0, 3).map((name, index) => ({ id: `group-${index + 1}`, name }))
+      ? values.groups.filter(Boolean).slice(0, 3).map((name, index) => ({
+        id: `group-${index + 1}`,
+        name,
+        coverUrl: groupCoverUrls[index] || ''
+      }))
       : [];
 
     const { data, error } = await supabase
@@ -1283,6 +1297,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     avatarFile?: File | null;
     features: Community['features'];
     groups: string[];
+    groupCoverFiles?: (File | null)[];
   }) => {
     if (!user || !supabase) return;
     const community = communities.find(item => item.id === communityId);
@@ -1291,8 +1306,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const coverUrl = values.coverFile ? await uploadCommunityImage(values.coverFile, 'cover') : community.coverUrl || '';
     const avatarUrl = values.avatarFile ? await uploadCommunityImage(values.avatarFile, 'avatar') : community.avatarUrl || '';
+    const groupCoverUrls = await Promise.all((values.groupCoverFiles || []).slice(0, 3).map((file, index) => (
+      file ? uploadCommunityImage(file, `group-${index + 1}`) : Promise.resolve(community.groups[index]?.coverUrl || '')
+    )));
     const groups = values.features.groups
-      ? values.groups.filter(Boolean).slice(0, 3).map((name, index) => ({ id: community.groups[index]?.id || `group-${index + 1}`, name }))
+      ? values.groups.filter(Boolean).slice(0, 3).map((name, index) => ({
+        id: community.groups[index]?.id || `group-${index + 1}`,
+        name,
+        coverUrl: groupCoverUrls[index] || community.groups[index]?.coverUrl || ''
+      }))
       : [];
 
     const { error } = await supabase
@@ -1312,6 +1334,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await loadCommunities();
   };
 
+  const deleteCommunity = async (communityId: string) => {
+    if (!user || !supabase) return;
+    const community = communities.find(item => item.id === communityId);
+    if (!community || community.ownerId !== user.id) throw new Error('Apenas o Diretor pode excluir a comunidade.');
+
+    const { error } = await supabase
+      .from('communities')
+      .delete()
+      .eq('id', communityId)
+      .eq('owner_id', user.id);
+
+    if (error) throw new Error(error.message);
+    setCommunities(prev => prev.filter(item => item.id !== communityId));
+  };
+
   const sendCommunityMessage = async (communityId: string, roomId: string, text: string) => {
     if (!user || !supabase || !text.trim()) return;
 
@@ -1322,7 +1359,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         room_id: roomId,
         user_id: user.id,
         text: text.trim(),
-        type: 'message'
+        type: 'message',
+        expires_at: roomId === 'cine-live' ? new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString() : null
       })
       .select('*')
       .single();
@@ -1345,7 +1383,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         room_id: roomId,
         user_id: user.id,
         text: `${user.name} entrou no Cine LIVE`,
-        type: 'system'
+        type: 'system',
+        expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
       })
       .select('*')
       .single();
@@ -1997,6 +2036,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createCommunityPost,
     updateCommunityLiveUrl,
     updateCommunity,
+    deleteCommunity,
     sendCommunityMessage,
     enterCommunityRoom,
     toggleFollowUser,

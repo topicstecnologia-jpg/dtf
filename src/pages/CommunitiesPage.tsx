@@ -13,6 +13,7 @@ import {
   Link as LinkIcon,
   MessageCircle,
   Plus,
+  Trash2,
   Send,
   ToggleLeft,
   ToggleRight,
@@ -44,6 +45,23 @@ const toEmbedUrl = (url?: string) => {
   return url;
 };
 
+const getVideoPreviewUrl = (url?: string) => {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtube.com')) {
+      const videoId = parsed.searchParams.get('v');
+      if (videoId) return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    }
+    if (parsed.hostname.includes('youtu.be')) {
+      return `https://img.youtube.com/vi/${parsed.pathname.replace('/', '')}/hqdefault.jpg`;
+    }
+  } catch {
+    return '';
+  }
+  return '';
+};
+
 export const CommunitiesPage: React.FC = () => {
   const {
     user,
@@ -54,6 +72,7 @@ export const CommunitiesPage: React.FC = () => {
     createCommunityPost,
     updateCommunityLiveUrl,
     updateCommunity,
+    deleteCommunity,
     sendCommunityMessage,
     enterCommunityRoom,
     getUserById
@@ -70,6 +89,8 @@ export const CommunitiesPage: React.FC = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState('');
   const [avatarPreview, setAvatarPreview] = useState('');
+  const [groupCoverFiles, setGroupCoverFiles] = useState<(File | null)[]>([null, null, null]);
+  const [groupCoverPreviews, setGroupCoverPreviews] = useState(['', '', '']);
   const [features, setFeatures] = useState<Community['features']>({
     cineLive: true,
     groups: true,
@@ -87,6 +108,7 @@ export const CommunitiesPage: React.FC = () => {
   const [liveUrlInput, setLiveUrlInput] = useState('');
   const [liveUrlError, setLiveUrlError] = useState('');
   const [isSavingLiveUrl, setIsSavingLiveUrl] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const directorCommunity = communities.find(community => community.ownerId === user?.id);
   const selectedCommunity = selectedCommunityId ? communities.find(community => community.id === selectedCommunityId) : undefined;
@@ -94,6 +116,7 @@ export const CommunitiesPage: React.FC = () => {
   const isOwner = Boolean(user && selectedCommunity?.ownerId === user.id);
   const referralLink = user ? `${window.location.origin}/?ref=${user.id}` : '';
   const embedUrl = toEmbedUrl(selectedCommunity?.features.cineLiveUrl);
+  const videoPreviewUrl = getVideoPreviewUrl(selectedCommunity?.features.cineLiveUrl) || selectedCommunity?.coverUrl || '';
   const selectedRoomMessages = selectedCommunity?.messages.filter(message => message.roomId === selectedRoomId) || [];
   const selectedGroup = selectedCommunity?.groups.find(group => group.id === selectedRoomId);
   const selectedRoomTitle = selectedRoomId === 'cine-live' ? 'Cine LIVE' : selectedGroup?.name || '';
@@ -137,6 +160,8 @@ export const CommunitiesPage: React.FC = () => {
     setAvatarFile(null);
     setCoverPreview('');
     setAvatarPreview('');
+    setGroupCoverFiles([null, null, null]);
+    setGroupCoverPreviews(['', '', '']);
     setFeatures({ cineLive: true, groups: true, posts: true, cineLiveUrl: '' });
     setGroupNames(['Geral', 'Sessões', 'Spoilers']);
     setCreateError('');
@@ -150,6 +175,12 @@ export const CommunitiesPage: React.FC = () => {
     setAvatarFile(null);
     setCoverPreview(selectedCommunity.coverUrl || '');
     setAvatarPreview(selectedCommunity.avatarUrl || '');
+    setGroupCoverFiles([null, null, null]);
+    setGroupCoverPreviews([
+      selectedCommunity.groups[0]?.coverUrl || '',
+      selectedCommunity.groups[1]?.coverUrl || '',
+      selectedCommunity.groups[2]?.coverUrl || ''
+    ]);
     setFeatures(selectedCommunity.features);
     setGroupNames([
       selectedCommunity.groups[0]?.name || 'Geral',
@@ -158,6 +189,12 @@ export const CommunitiesPage: React.FC = () => {
     ]);
     setCreateError('');
     setIsEditingCommunity(true);
+  };
+
+  const handleGroupCoverChange = (index: number, file?: File) => {
+    if (!file) return;
+    setGroupCoverFiles(prev => prev.map((item, itemIndex) => itemIndex === index ? file : item));
+    setGroupCoverPreviews(prev => prev.map((item, itemIndex) => itemIndex === index ? URL.createObjectURL(file) : item));
   };
 
   const handleCreateCommunity = async (event: React.FormEvent) => {
@@ -172,7 +209,8 @@ export const CommunitiesPage: React.FC = () => {
         coverFile,
         avatarFile,
         features,
-        groups: groupNames
+        groups: groupNames,
+        groupCoverFiles
       });
       resetCreateForm();
       setIsCreating(false);
@@ -196,11 +234,28 @@ export const CommunitiesPage: React.FC = () => {
         coverFile,
         avatarFile,
         features,
-        groups: groupNames
+        groups: groupNames,
+        groupCoverFiles
       });
       setIsEditingCommunity(false);
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Não foi possível editar a comunidade.');
+    } finally {
+      setIsSavingCommunity(false);
+    }
+  };
+
+  const handleDeleteCommunity = async () => {
+    if (!selectedCommunity) return;
+    setDeleteError('');
+    setIsSavingCommunity(true);
+    try {
+      await deleteCommunity(selectedCommunity.id);
+      setSelectedCommunityId('');
+      setSelectedRoomId('');
+      setIsEditingCommunity(false);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Não foi possível excluir a comunidade.');
     } finally {
       setIsSavingCommunity(false);
     }
@@ -436,22 +491,22 @@ export const CommunitiesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-5 px-4 py-5">
+            <div className={selectedRoomId ? "flex h-[calc(100dvh-4rem)] flex-col px-0 py-0" : "space-y-5 px-4 py-5"}>
               {selectedRoomId ? (
-                <div className="space-y-4">
+                <div className="flex min-h-0 flex-1 flex-col">
                   {selectedRoomId === 'cine-live' && selectedCommunity.features.cineLive && (
-                    <div className="space-y-3">
+                    <div className="shrink-0 border-b border-white/10 bg-black">
                       {embedUrl ? (
-                        <div className="aspect-video overflow-hidden rounded-[24px] bg-black">
+                        <div className="aspect-video bg-black">
                           <iframe src={embedUrl} title="Cine LIVE" className="h-full w-full" allowFullScreen />
                         </div>
                       ) : (
-                        <div className="rounded-[24px] border border-dashed border-white/10 p-6 text-sm text-zinc-500">
+                        <div className="flex aspect-video items-center justify-center bg-[#222226] p-6 text-sm text-zinc-500">
                           O Diretor ainda não adicionou um link.
                         </div>
                       )}
                       {isOwner && (
-                        <form onSubmit={handleSaveLiveUrl} className="space-y-2">
+                        <form onSubmit={handleSaveLiveUrl} className="space-y-2 p-3">
                           <div className="flex gap-2">
                             <input
                               value={liveUrlInput}
@@ -473,8 +528,8 @@ export const CommunitiesPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[#222226]">
-                    <div className="max-h-[42vh] min-h-[260px] space-y-3 overflow-y-auto p-4">
+                  <div className="flex min-h-0 flex-1 flex-col bg-[#17171B]">
+                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
                       {selectedRoomMessages.length === 0 ? (
                         <p className="py-12 text-center text-sm text-zinc-500">Nenhuma mensagem ainda.</p>
                       ) : selectedRoomMessages.map(message => {
@@ -488,16 +543,23 @@ export const CommunitiesPage: React.FC = () => {
                         }
                         const isMine = message.userId === user?.id;
                         return (
-                          <div key={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                          <div key={message.id} className={`flex items-start gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
+                            {messageUser?.avatarUrl ? (
+                              <img src={messageUser.avatarUrl} alt={messageUser.name} className="h-8 w-8 rounded-full object-cover" />
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3F1521] text-xs font-bold">
+                                {messageUser?.name.charAt(0) || 'U'}
+                              </div>
+                            )}
                             <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${isMine ? 'bg-[#3F1521] text-white' : 'bg-white/8 text-zinc-100'}`}>
-                              {!isMine && <p className="mb-1 text-[11px] font-bold text-[#E4B5C2]">{messageUser?.handle || '@usuario'}</p>}
+                              <p className="mb-1 text-[11px] font-bold text-[#E4B5C2]">{messageUser?.handle || '@usuario'}</p>
                               <p className="break-words text-sm leading-relaxed">{message.text}</p>
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                    <form onSubmit={handleSendRoomMessage} className="flex gap-2 border-t border-white/10 p-3">
+                    <form onSubmit={handleSendRoomMessage} className="shrink-0 flex gap-2 border-t border-white/10 bg-[#222226] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                       <input
                         value={roomMessage}
                         onChange={(event) => setRoomMessage(event.target.value)}
@@ -521,7 +583,7 @@ export const CommunitiesPage: React.FC = () => {
                       className="w-full overflow-hidden rounded-[24px] border border-white/10 bg-[#222226] text-left"
                     >
                       <div className="relative h-32 bg-black">
-                        {selectedCommunity.coverUrl && <img src={selectedCommunity.coverUrl} alt="Cine LIVE" className="h-full w-full object-cover opacity-45" />}
+                        {videoPreviewUrl && <img src={videoPreviewUrl} alt="Cine LIVE" className="h-full w-full object-cover opacity-55" />}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                         <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
                           <span className="text-lg font-bold">Cine LIVE</span>
@@ -538,13 +600,19 @@ export const CommunitiesPage: React.FC = () => {
                           key={group.id}
                           type="button"
                           onClick={() => openRoom(group.id)}
-                          className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#222226] px-4 py-5 text-left"
-                        >
-                          <span className="flex items-center gap-3">
-                            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#3F1521] text-[#E4B5C2]">
-                              <MessageCircle size={19} />
+                        className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#222226] px-4 py-5 text-left"
+                      >
+                          <span className="flex min-w-0 items-center gap-3">
+                            <span className="h-14 w-14 overflow-hidden rounded-2xl bg-[#3F1521] text-[#E4B5C2]">
+                              {group.coverUrl ? (
+                                <img src={group.coverUrl} alt={group.name} className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="flex h-full w-full items-center justify-center">
+                                  <MessageCircle size={19} />
+                                </span>
+                              )}
                             </span>
-                            <span className="text-base font-bold">{group.name}</span>
+                            <span className="truncate text-base font-bold">{group.name}</span>
                           </span>
                           <ExternalLink size={17} className="text-zinc-500" />
                         </button>
@@ -751,19 +819,42 @@ export const CommunitiesPage: React.FC = () => {
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-300">Grupos</label>
                   {groupNames.map((groupName, index) => (
-                    <input
-                      key={index}
-                      value={groupName}
-                      onChange={(event) => setGroupNames(prev => prev.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
-                      className="w-full rounded-full border border-white/10 bg-[#17171B] px-5 py-3 text-sm text-white outline-none focus:border-white/25"
-                      placeholder={`Grupo ${index + 1}`}
-                    />
+                    <div key={index} className="flex gap-2">
+                      <label className="h-12 w-14 shrink-0 cursor-pointer overflow-hidden rounded-2xl border border-white/10 bg-[#17171B]">
+                        {groupCoverPreviews[index] ? (
+                          <img src={groupCoverPreviews[index]} alt={`Capa do grupo ${index + 1}`} className="h-full w-full object-cover" />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-zinc-500">
+                            <Camera size={16} />
+                          </span>
+                        )}
+                        <input type="file" accept="image/*" className="hidden" onChange={(event) => handleGroupCoverChange(index, event.target.files?.[0])} />
+                      </label>
+                      <input
+                        value={groupName}
+                        onChange={(event) => setGroupNames(prev => prev.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                        className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#17171B] px-5 py-3 text-sm text-white outline-none focus:border-white/25"
+                        placeholder={`Grupo ${index + 1}`}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
             </div>
 
             <div className="border-t border-white/10 p-5">
+              {isEditingCommunity && selectedCommunity?.ownerId === user?.id && (
+                <button
+                  type="button"
+                  disabled={isSavingCommunity}
+                  onClick={handleDeleteCommunity}
+                  className="mb-3 flex h-11 w-full items-center justify-center gap-2 rounded-full border border-red-500/30 text-sm font-bold text-red-300 disabled:opacity-60"
+                >
+                  <Trash2 size={16} />
+                  Excluir comunidade
+                </button>
+              )}
+              {deleteError && <p className="mb-3 text-sm text-red-300">{deleteError}</p>}
               {createError && <p className="mb-3 text-sm text-red-300">{createError}</p>}
               <button
                 type="submit"

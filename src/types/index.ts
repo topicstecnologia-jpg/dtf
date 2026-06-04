@@ -53,11 +53,13 @@ export interface CommunityMessage {
   text: string;
   type: 'message' | 'system';
   timestamp: number;
+  expiresAt?: number;
 }
 
 export interface CommunityGroup {
   id: string;
   name: string;
+  coverUrl?: string;
 }
 
 export interface CommunityFeatures {
