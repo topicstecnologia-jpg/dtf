@@ -8,6 +8,7 @@ import {
   Crown,
   ArrowLeft,
   Edit3,
+  FileText,
   ExternalLink,
   Image as ImageIcon,
   Link as LinkIcon,
@@ -75,6 +76,10 @@ export const CommunitiesPage: React.FC = () => {
     deleteCommunity,
     sendCommunityMessage,
     enterCommunityRoom,
+    anonymousScripts,
+    sendAnonymousScript,
+    markAnonymousScriptRead,
+    deleteAnonymousScript,
     getUserById
   } = useApp();
   const [copied, setCopied] = useState(false);
@@ -109,6 +114,13 @@ export const CommunitiesPage: React.FC = () => {
   const [liveUrlError, setLiveUrlError] = useState('');
   const [isSavingLiveUrl, setIsSavingLiveUrl] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [scriptMode, setScriptMode] = useState<'instant' | '24h' | ''>('');
+  const [scriptTitle, setScriptTitle] = useState('');
+  const [scriptRecipient, setScriptRecipient] = useState('');
+  const [scriptBody, setScriptBody] = useState('');
+  const [scriptError, setScriptError] = useState('');
+  const [isSendingScript, setIsSendingScript] = useState(false);
+  const [openScriptId, setOpenScriptId] = useState('');
 
   const directorCommunity = communities.find(community => community.ownerId === user?.id);
   const selectedCommunity = selectedCommunityId ? communities.find(community => community.id === selectedCommunityId) : undefined;
@@ -120,6 +132,8 @@ export const CommunitiesPage: React.FC = () => {
   const selectedRoomMessages = selectedCommunity?.messages.filter(message => message.roomId === selectedRoomId) || [];
   const selectedGroup = selectedCommunity?.groups.find(group => group.id === selectedRoomId);
   const selectedRoomTitle = selectedRoomId === 'cine-live' ? 'Cine LIVE' : selectedGroup?.name || '';
+  const visibleAnonymousScripts = anonymousScripts.filter(script => script.mode === '24h');
+  const openScript = anonymousScripts.find(script => script.id === openScriptId);
   const sortedCommunities = useMemo(() => {
     const cineClub = communities.find(community => community.id === CINECLUB_ID);
     const rest = communities.filter(community => community.id !== CINECLUB_ID);
@@ -136,6 +150,11 @@ export const CommunitiesPage: React.FC = () => {
     setLiveUrlInput(selectedCommunity?.features.cineLiveUrl || '');
     setLiveUrlError('');
   }, [selectedCommunity?.id, selectedCommunity?.features.cineLiveUrl]);
+
+  useEffect(() => {
+    if (!openScript || openScript.readAt) return;
+    markAnonymousScriptRead(openScript.id).catch(() => undefined);
+  }, [openScript?.id, openScript?.readAt]);
 
   const copyReferralLink = async () => {
     await navigator.clipboard?.writeText(referralLink);
@@ -322,6 +341,35 @@ export const CommunitiesPage: React.FC = () => {
     setRoomMessage('');
   };
 
+  const resetScriptForm = () => {
+    setScriptMode('');
+    setScriptTitle('');
+    setScriptRecipient('');
+    setScriptBody('');
+    setScriptError('');
+  };
+
+  const handleSendAnonymousScript = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!scriptMode) return;
+    setScriptError('');
+    setIsSendingScript(true);
+
+    try {
+      await sendAnonymousScript({
+        recipientHandle: scriptRecipient,
+        mode: scriptMode,
+        title: scriptTitle,
+        body: scriptBody
+      });
+      resetScriptForm();
+    } catch (error) {
+      setScriptError(error instanceof Error ? error.message : 'Não foi possível enviar o roteiro.');
+    } finally {
+      setIsSendingScript(false);
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-[#17171B] text-white ${selectedRoomId ? 'pb-0' : 'pb-28'}`}>
       <div className="sticky top-0 z-40 border-b border-white/5 bg-[#17171B]/90 px-4 py-4 backdrop-blur-xl">
@@ -342,9 +390,22 @@ export const CommunitiesPage: React.FC = () => {
                 <ArrowLeft size={16} />
                 Voltar
               </button>
-              <div className="min-w-0 text-right">
-                <p className="truncate text-sm font-bold">{selectedRoomTitle || selectedCommunity.name}</p>
-                {!selectedRoomId && <p className="text-[10px] uppercase tracking-[0.18em] text-[#E4B5C2]">Comunidade</p>}
+              <div className="flex min-w-0 items-center gap-2 text-right">
+                {selectedRoomId && selectedRoomId !== 'cine-live' && (
+                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-[#3F1521]">
+                    {selectedGroup?.coverUrl ? (
+                      <img src={selectedGroup.coverUrl} alt={selectedGroup.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs font-bold">
+                        {selectedRoomTitle.charAt(0) || 'G'}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold">{selectedRoomTitle || selectedCommunity.name}</p>
+                  {!selectedRoomId && <p className="text-[10px] uppercase tracking-[0.18em] text-[#E4B5C2]">Comunidade</p>}
+                </div>
               </div>
             </>
           ) : (
@@ -362,7 +423,16 @@ export const CommunitiesPage: React.FC = () => {
       </div>
 
       <div className={selectedCommunity ? 'space-y-0' : 'space-y-5 p-4'}>
-        {!selectedCommunity && (
+        {!selectedCommunity && user?.directorEligible && (
+          <div className="px-1">
+            <div className="inline-flex items-center gap-2 text-sm font-bold text-[#E4B5C2]">
+              <Crown size={16} />
+              Você é um Diretor
+            </div>
+          </div>
+        )}
+
+        {!selectedCommunity && !user?.directorEligible && (
         <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#222226]">
           <div className="relative min-h-[220px] p-5">
             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1517602302552-471fe67acf66?auto=format&fit=crop&w=1200&q=80')] bg-cover bg-center opacity-30" />
@@ -387,18 +457,7 @@ export const CommunitiesPage: React.FC = () => {
                 style={{ width: `${Math.min(referralCount / 5, 1) * 100}%` }}
               />
             </div>
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1 rounded-full bg-black/25 px-4 py-3 text-xs text-zinc-300 truncate">
-                {referralLink}
-              </div>
-              <button
-                type="button"
-                onClick={copyReferralLink}
-                className="shrink-0 rounded-full bg-white px-4 py-3 text-sm font-bold text-black"
-              >
-                {copied ? <Check size={18} /> : <Copy size={18} />}
-              </button>
-            </div>
+            <p className="text-xs text-zinc-400">{Math.min(referralCount, 5)} de 5 indicações concluídas.</p>
           </div>
         </section>
         )}
@@ -457,6 +516,84 @@ export const CommunitiesPage: React.FC = () => {
         </section>
         )}
 
+        {!selectedCommunity && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">Roteiros Anônimos</h2>
+              {visibleAnonymousScripts.length > 0 && (
+                <span className="text-xs text-zinc-500">{visibleAnonymousScripts.length} recebidos</span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  mode: 'instant' as const,
+                  title: 'Roteiro Instante',
+                  text: 'Desaparece após a leitura.'
+                },
+                {
+                  mode: '24h' as const,
+                  title: 'Roteiro 24 horas',
+                  text: 'Fica disponível por 24 horas.'
+                }
+              ].map(card => (
+                <button
+                  key={card.mode}
+                  type="button"
+                  onClick={() => {
+                    resetScriptForm();
+                    setScriptMode(card.mode);
+                  }}
+                  className="rounded-[24px] border border-white/10 bg-[#222226] p-4 text-left"
+                >
+                  <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#3F1521] text-[#E4B5C2]">
+                    <FileText size={21} />
+                  </div>
+                  <p className="text-sm font-bold">{card.title}</p>
+                  <p className="mt-2 text-xs leading-relaxed text-zinc-500">{card.text}</p>
+                </button>
+              ))}
+            </div>
+
+            {visibleAnonymousScripts.length > 0 && (
+              <div className="space-y-2">
+                {visibleAnonymousScripts.map(script => (
+                  <button
+                    key={script.id}
+                    type="button"
+                    onClick={() => setOpenScriptId(script.id)}
+                    className="flex w-full items-center justify-between rounded-[20px] border border-white/10 bg-black/20 px-4 py-3 text-left"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-bold">{script.title}</span>
+                      <span className="text-xs text-zinc-500">Disponível por 24 horas</span>
+                    </span>
+                    <FileText size={17} className="text-[#E4B5C2]" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {!selectedCommunity && user && (
+          <section className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.16em] text-[#E4B5C2]">Link de convite</p>
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1 truncate rounded-full bg-white/5 px-4 py-3 text-xs text-zinc-300">
+                {referralLink}
+              </div>
+              <button
+                type="button"
+                onClick={copyReferralLink}
+                className="shrink-0 rounded-full bg-white px-4 py-3 text-sm font-bold text-black"
+              >
+                {copied ? <Check size={18} /> : <Copy size={18} />}
+              </button>
+            </div>
+          </section>
+        )}
+
         {selectedCommunity && (
           <section className="min-h-screen bg-[#17171B]">
             {!selectedRoomId && (
@@ -493,9 +630,9 @@ export const CommunitiesPage: React.FC = () => {
             </div>
             )}
 
-            <div className={selectedRoomId ? "flex h-[calc(100dvh-4.25rem)] flex-col px-0 py-0" : "space-y-5 px-4 py-5"}>
+            <div className={selectedRoomId ? "flex h-[calc(100dvh-10.75rem)] flex-col overflow-hidden px-0 py-0 md:h-[calc(100dvh-9.5rem)]" : "space-y-5 px-4 py-5"}>
               {selectedRoomId ? (
-                <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   {selectedRoomId === 'cine-live' && selectedCommunity.features.cineLive && (
                     <div className="shrink-0 border-b border-white/10 bg-black">
                       {embedUrl ? (
@@ -561,7 +698,7 @@ export const CommunitiesPage: React.FC = () => {
                         );
                       })}
                     </div>
-                    <form onSubmit={handleSendRoomMessage} className="shrink-0 flex gap-2 border-t border-white/10 bg-[#222226] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                    <form onSubmit={handleSendRoomMessage} className="shrink-0 flex gap-2 border-t border-white/10 bg-[#222226] p-3">
                       <input
                         value={roomMessage}
                         onChange={(event) => setRoomMessage(event.target.value)}
@@ -719,6 +856,104 @@ export const CommunitiesPage: React.FC = () => {
           </section>
         )}
       </div>
+
+      {scriptMode && (
+        <div className="fixed inset-0 z-[132] flex items-end justify-center bg-black/80 p-0 backdrop-blur-sm md:items-center md:p-5">
+          <motion.form
+            onSubmit={handleSendAnonymousScript}
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-[32px] border border-white/10 bg-[#1F1F24] shadow-2xl md:rounded-[28px]"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 p-5">
+              <h2 className="text-xl font-bold">{scriptMode === 'instant' ? 'Roteiro Instante' : 'Roteiro 24 horas'}</h2>
+              <button type="button" onClick={resetScriptForm} className="rounded-full bg-white/5 p-2 text-zinc-300">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-4 overflow-y-auto p-5">
+              <input
+                value={scriptTitle}
+                onChange={(event) => setScriptTitle(event.target.value)}
+                className="w-full rounded-full border border-white/10 bg-[#17171B] px-5 py-4 text-white outline-none focus:border-white/25"
+                placeholder="Título"
+              />
+              <input
+                value={scriptRecipient}
+                onChange={(event) => setScriptRecipient(event.target.value)}
+                className="w-full rounded-full border border-white/10 bg-[#17171B] px-5 py-4 text-white outline-none focus:border-white/25"
+                placeholder="@ de quem vai receber"
+              />
+              <div className="rounded-[24px] bg-[#F3E8D5] p-5 text-[#17110B] shadow-inner">
+                <p className="mb-4 text-center font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#5C4B3A]">
+                  Roteiro anônimo
+                </p>
+                <p className="mb-3 font-mono text-sm font-bold uppercase">SALA. INT. NOITE</p>
+                <textarea
+                  value={scriptBody}
+                  onChange={(event) => setScriptBody(event.target.value)}
+                  className="min-h-44 w-full resize-none bg-transparent font-mono text-sm leading-relaxed text-[#17110B] outline-none placeholder:text-[#8B7762]"
+                  placeholder="Escreva a cena, a fala, o sentimento..."
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 p-5">
+              {scriptError && <p className="mb-3 text-sm text-red-300">{scriptError}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={resetScriptForm} className="h-12 flex-1 rounded-full border border-white/10 font-bold text-white">
+                  Excluir
+                </button>
+                <button type="submit" disabled={isSendingScript} className="h-12 flex-1 rounded-full bg-[#3F1521] font-bold text-white disabled:opacity-60">
+                  {isSendingScript ? 'Enviando...' : 'Enviar'}
+                </button>
+              </div>
+            </div>
+          </motion.form>
+        </div>
+      )}
+
+      {openScript && (
+        <div className="fixed inset-0 z-[133] flex items-center justify-center bg-black/85 p-5 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="max-h-[88vh] w-full max-w-md overflow-hidden rounded-[30px] border border-white/10 bg-[#1F1F24] shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 p-4">
+              <h2 className="truncate text-lg font-bold">{openScript.title}</h2>
+              <button type="button" onClick={() => setOpenScriptId('')} className="rounded-full bg-white/5 p-2 text-zinc-300">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="max-h-[68vh] overflow-y-auto p-4">
+              <div className="rounded-[24px] bg-[#F3E8D5] p-6 text-[#17110B]">
+                <p className="mb-5 text-center font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#5C4B3A]">
+                  Roteiro anônimo
+                </p>
+                <p className="mb-5 font-mono text-sm font-bold uppercase">{openScript.sceneHeading}</p>
+                <p className="whitespace-pre-wrap font-mono text-sm leading-7">{openScript.body}</p>
+              </div>
+            </div>
+            <div className="flex gap-2 border-t border-white/10 p-4">
+              <button
+                type="button"
+                onClick={async () => {
+                  await deleteAnonymousScript(openScript.id);
+                  setOpenScriptId('');
+                }}
+                className="h-11 flex-1 rounded-full border border-red-500/30 text-sm font-bold text-red-300"
+              >
+                Excluir
+              </button>
+              <button type="button" onClick={() => setOpenScriptId('')} className="h-11 flex-1 rounded-full bg-white text-sm font-bold text-black">
+                Fechar
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {(isCreating || isEditingCommunity) && (
         <div className="fixed inset-0 z-[132] flex items-end justify-center bg-black/80 p-0 backdrop-blur-sm md:items-center md:p-5">

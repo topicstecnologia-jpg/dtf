@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment, Story, Community, CommunityPost, CommunityMessage } from '../types';
+import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment, Story, Community, CommunityPost, CommunityMessage, AnonymousScript } from '../types';
 import { MOVIES } from '../data/mock';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { createDefaultProfile, mapProfileRowToUser, mapUserToProfileRow, normalizeHandle } from '../lib/profile';
@@ -13,6 +13,7 @@ interface AppContextType {
   posts: Post[];
   stories: Story[];
   communities: Community[];
+  anonymousScripts: AnonymousScript[];
   onlineUserIds: string[];
   unreadMessageCount: number;
   referralCount: number;
@@ -56,6 +57,9 @@ interface AppContextType {
   deleteCommunity: (communityId: string) => Promise<void>;
   sendCommunityMessage: (communityId: string, roomId: string, text: string) => Promise<void>;
   enterCommunityRoom: (communityId: string, roomId: string) => Promise<void>;
+  sendAnonymousScript: (values: { recipientHandle: string; mode: AnonymousScript['mode']; title: string; body: string }) => Promise<void>;
+  markAnonymousScriptRead: (scriptId: string) => Promise<void>;
+  deleteAnonymousScript: (scriptId: string) => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
   updatePost: (postId: string, values: { caption: string }) => Promise<void>;
@@ -94,6 +98,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [posts, setPosts] = useState<Post[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [anonymousScripts, setAnonymousScripts] = useState<AnonymousScript[]>([]);
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [directorCelebrationOpen, setDirectorCelebrationOpen] = useState(false);
   const [readMessagesByMatch, setReadMessagesByMatch] = useState<Record<string, number>>({});
@@ -348,6 +353,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createdAt: new Date(row.created_at).getTime()
   });
 
+  const mapAnonymousScriptRow = (row: any): AnonymousScript => ({
+    id: row.id,
+    recipientId: row.recipient_id,
+    mode: row.mode || 'instant',
+    title: row.title || 'Roteiro anônimo',
+    sceneHeading: row.scene_heading || 'SALA. INT. NOITE',
+    body: row.body || '',
+    readAt: row.read_at ? new Date(row.read_at).getTime() : undefined,
+    expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : Date.now(),
+    timestamp: new Date(row.created_at).getTime()
+  });
+
+  const filterVisibleAnonymousScripts = (scripts: AnonymousScript[]) => (
+    scripts.filter(script => (
+      script.expiresAt > Date.now() &&
+      (script.mode !== 'instant' || !script.readAt)
+    ))
+  );
+
   const hydratePostViews = async (mappedPosts: Post[]) => {
     if (!supabase || mappedPosts.length === 0) return mappedPosts;
 
@@ -447,8 +471,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCommunities(hasCineClub ? mapped : [cineClubCommunity, ...mapped]);
   };
 
+  const loadAnonymousScripts = async (currentUserId = user?.id) => {
+    if (!supabase || !currentUserId) {
+      setAnonymousScripts([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('anonymous_scripts')
+      .select('*')
+      .eq('recipient_id', currentUserId)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      setAnonymousScripts([]);
+      return;
+    }
+
+    setAnonymousScripts(filterVisibleAnonymousScripts((data || []).map(mapAnonymousScriptRow)));
+  };
+
   const refreshAppData = async (currentUserId: string) => {
-    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadPosts(), loadStories(), loadCommunities()]);
+    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadPosts(), loadStories(), loadCommunities(), loadAnonymousScripts(currentUserId)]);
   };
 
   const syncSession = async () => {
@@ -944,6 +989,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           loadCommunities();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'anonymous_scripts', filter: `recipient_id=eq.${user.id}` },
+        (payload) => {
+          const script = mapAnonymousScriptRow(payload.new as any);
+          setAnonymousScripts(prev => filterVisibleAnonymousScripts([script, ...prev.filter(item => item.id !== script.id)]));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'anonymous_scripts', filter: `recipient_id=eq.${user.id}` },
+        (payload) => {
+          const script = mapAnonymousScriptRow(payload.new as any);
+          setAnonymousScripts(prev => filterVisibleAnonymousScripts(prev.map(item => item.id === script.id ? script : item)));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'anonymous_scripts', filter: `recipient_id=eq.${user.id}` },
+        (payload) => {
+          setAnonymousScripts(prev => prev.filter(item => item.id !== (payload.old as any).id));
+        }
+      )
       .subscribe();
 
     return () => {
@@ -1398,6 +1466,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     )));
   };
 
+  const sendAnonymousScript = async (values: { recipientHandle: string; mode: AnonymousScript['mode']; title: string; body: string }) => {
+    if (!user || !supabase) return;
+    const normalizedHandle = normalizeHandle(values.recipientHandle);
+    const recipient = profileUsers.find(profile => normalizeHandle(profile.handle) === normalizedHandle);
+
+    if (!recipient) throw new Error('Usuário não encontrado.');
+    if (recipient.id === user.id) throw new Error('Escolha outro usuário para receber o roteiro.');
+    if (!values.title.trim() || !values.body.trim()) throw new Error('Preencha o título e o texto do roteiro.');
+
+    const isUnlimited = isDirectorTestHandle(user.handle) || isDirectorTestHandle(recipient.handle);
+    if (!isUnlimited) {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const { count, error: countError } = await supabase
+        .from('anonymous_scripts')
+        .select('id', { count: 'exact', head: true })
+        .eq('recipient_id', recipient.id)
+        .gte('created_at', startOfDay.toISOString());
+
+      if (countError) throw new Error(countError.message);
+      if ((count || 0) >= 3) throw new Error('Esse usuário já recebeu 3 roteiros anônimos hoje.');
+    }
+
+    const headings = [
+      'SALA. INT. NOITE',
+      'RUA. EXT. DIA',
+      'CINEMA. INT. FIM DE TARDE',
+      'QUARTO. INT. MADRUGADA',
+      'VARANDA. EXT. NOITE',
+      'ESTAÇÃO. EXT. AMANHECER'
+    ];
+
+    const { error } = await supabase.from('anonymous_scripts').insert({
+      sender_id: user.id,
+      recipient_id: recipient.id,
+      mode: values.mode,
+      title: values.title.trim(),
+      scene_heading: headings[Math.floor(Math.random() * headings.length)],
+      body: values.body.trim(),
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString()
+    });
+
+    if (error) throw new Error(error.message);
+  };
+
+  const markAnonymousScriptRead = async (scriptId: string) => {
+    if (!user || !supabase) return;
+    const script = anonymousScripts.find(item => item.id === scriptId);
+    const readAt = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('anonymous_scripts')
+      .update({ read_at: readAt })
+      .eq('id', scriptId)
+      .eq('recipient_id', user.id);
+
+    if (error) throw new Error(error.message);
+
+    setAnonymousScripts(prev => (
+      script?.mode === 'instant'
+        ? prev.filter(item => item.id !== scriptId)
+        : prev.map(item => item.id === scriptId ? { ...item, readAt: Date.now() } : item)
+    ));
+  };
+
+  const deleteAnonymousScript = async (scriptId: string) => {
+    if (!user || !supabase) return;
+
+    const { error } = await supabase
+      .from('anonymous_scripts')
+      .delete()
+      .eq('id', scriptId)
+      .eq('recipient_id', user.id);
+
+    if (error) throw new Error(error.message);
+    setAnonymousScripts(prev => prev.filter(item => item.id !== scriptId));
+  };
+
   const updateFavoriteMovies = async (movieIds: string[]) => {
     if (!user || !supabase) return;
     const favoriteMovies = movieIds.slice(0, 5);
@@ -1461,6 +1607,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMatches([]);
     setChats([]);
     setPosts([]);
+    setStories([]);
+    setCommunities([]);
+    setAnonymousScripts([]);
   };
 
   const completeOnboarding = async (answers: Record<string, string>) => {
@@ -2011,6 +2160,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     posts,
     stories,
     communities,
+    anonymousScripts,
     onlineUserIds,
     unreadMessageCount,
     referralCount,
@@ -2039,6 +2189,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     deleteCommunity,
     sendCommunityMessage,
     enterCommunityRoom,
+    sendAnonymousScript,
+    markAnonymousScriptRead,
+    deleteAnonymousScript,
     toggleFollowUser,
     createPost,
     updatePost,
@@ -2063,7 +2216,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     markChatRead,
     getUnreadMessagesForMatch,
     isUserOnline
-  }), [user, profileUsers, movies, matches, chats, posts, stories, communities, onlineUserIds, unreadMessageCount, referralCount, directorCelebrationOpen, currentMovieIndex, isLoading, authError, readMessagesByMatch]);
+  }), [user, profileUsers, movies, matches, chats, posts, stories, communities, anonymousScripts, onlineUserIds, unreadMessageCount, referralCount, directorCelebrationOpen, currentMovieIndex, isLoading, authError, readMessagesByMatch]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

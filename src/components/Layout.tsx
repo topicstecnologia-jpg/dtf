@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon, Clapperboard, Sparkles } from 'lucide-react';
+import { Home, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon, Clapperboard, Sparkles, FileText } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { AnimatePresence, motion } from 'framer-motion';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation();
-  const { user, unreadMessageCount, updateHandle, createPost, directorCelebrationOpen, dismissDirectorCelebration } = useApp();
+  const { user, unreadMessageCount, updateHandle, createPost, directorCelebrationOpen, dismissDirectorCelebration, anonymousScripts, markAnonymousScriptRead } = useApp();
   const [handleInput, setHandleInput] = useState(user?.handle?.replace(/^@/, '') || '');
   const [handleError, setHandleError] = useState('');
   const [isSavingHandle, setIsSavingHandle] = useState(false);
@@ -16,6 +16,9 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [postPreview, setPostPreview] = useState('');
   const [postError, setPostError] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
+  const [activeScriptId, setActiveScriptId] = useState('');
+  const pendingAnonymousScript = anonymousScripts.find(script => !script.readAt);
+  const activeAnonymousScript = anonymousScripts.find(script => script.id === activeScriptId);
 
   if (!user) {
     return <div className="min-h-screen bg-light-bg text-text-main">{children}</div>;
@@ -269,6 +272,75 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       )}
 
       <AnimatePresence>
+        {pendingAnonymousScript && !activeAnonymousScript && (
+          <div className="fixed inset-0 z-[138] flex items-center justify-center bg-black/70 p-6 backdrop-blur-lg">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="w-full max-w-sm rounded-[30px] border border-white/10 bg-[#1F1F24] p-6 text-center shadow-2xl"
+            >
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#3F1521] text-[#E4B5C2]">
+                <FileText size={25} />
+              </div>
+              <h2 className="text-xl font-bold">Você recebeu um roteiro anônimo</h2>
+              <button
+                type="button"
+                onClick={() => setActiveScriptId(pendingAnonymousScript.id)}
+                className="mt-5 h-12 w-full rounded-full bg-white font-bold text-black"
+              >
+                Abrir
+              </button>
+            </motion.div>
+          </div>
+        )}
+
+        {activeAnonymousScript && (
+          <div className="fixed inset-0 z-[139] flex items-center justify-center bg-black/85 p-5 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="max-h-[88vh] w-full max-w-md overflow-hidden rounded-[30px] border border-white/10 bg-[#1F1F24] shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 p-4">
+                <h2 className="truncate text-lg font-bold">{activeAnonymousScript.title}</h2>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await markAnonymousScriptRead(activeAnonymousScript.id);
+                    setActiveScriptId('');
+                  }}
+                  className="rounded-full bg-white/5 p-2 text-zinc-300"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="max-h-[68vh] overflow-y-auto p-4">
+                <div className="rounded-[24px] bg-[#F3E8D5] p-6 text-[#17110B]">
+                  <p className="mb-5 text-center font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#5C4B3A]">
+                    Roteiro anônimo
+                  </p>
+                  <p className="mb-5 font-mono text-sm font-bold uppercase">{activeAnonymousScript.sceneHeading}</p>
+                  <p className="whitespace-pre-wrap font-mono text-sm leading-7">{activeAnonymousScript.body}</p>
+                </div>
+              </div>
+              <div className="border-t border-white/10 p-4">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await markAnonymousScriptRead(activeAnonymousScript.id);
+                    setActiveScriptId('');
+                  }}
+                  className="h-11 w-full rounded-full bg-white text-sm font-bold text-black"
+                >
+                  Fechar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
         {directorCelebrationOpen && (
           <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/85 p-6 backdrop-blur-xl">
             <motion.div

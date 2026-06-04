@@ -163,8 +163,27 @@ create table if not exists public.community_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.anonymous_scripts (
+  id uuid primary key default gen_random_uuid(),
+  sender_id uuid references public.profiles(id) on delete set null,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  mode text not null check (mode in ('instant', '24h')),
+  title text not null,
+  scene_heading text not null,
+  body text not null,
+  read_at timestamptz,
+  expires_at timestamptz not null default (now() + interval '24 hours'),
+  created_at timestamptz not null default now()
+);
+
 alter table public.community_messages
   add column if not exists expires_at timestamptz;
+
+alter table public.anonymous_scripts
+  add column if not exists read_at timestamptz;
+
+alter table public.anonymous_scripts
+  add column if not exists expires_at timestamptz not null default (now() + interval '24 hours');
 
 alter table public.profiles
   add column if not exists username_configured boolean not null default false;
@@ -530,6 +549,18 @@ begin
   then
     alter publication supabase_realtime add table public.community_messages;
   end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'anonymous_scripts'
+    )
+  then
+    alter publication supabase_realtime add table public.anonymous_scripts;
+  end if;
 end;
 $$;
 
@@ -618,6 +649,7 @@ alter table public.communities enable row level security;
 alter table public.community_members enable row level security;
 alter table public.community_posts enable row level security;
 alter table public.community_messages enable row level security;
+alter table public.anonymous_scripts enable row level security;
 
 drop policy if exists "Profiles are visible to authenticated users" on public.profiles;
 create policy "Profiles are visible to authenticated users"
@@ -962,6 +994,31 @@ create policy "Community members can send messages"
       and community_members.user_id = auth.uid()
     )
   );
+
+drop policy if exists "Recipients can read anonymous scripts" on public.anonymous_scripts;
+create policy "Recipients can read anonymous scripts"
+  on public.anonymous_scripts for select
+  to authenticated
+  using (auth.uid() = recipient_id);
+
+drop policy if exists "Users can send anonymous scripts" on public.anonymous_scripts;
+create policy "Users can send anonymous scripts"
+  on public.anonymous_scripts for insert
+  to authenticated
+  with check (auth.uid() = sender_id and auth.uid() <> recipient_id);
+
+drop policy if exists "Recipients can update anonymous scripts" on public.anonymous_scripts;
+create policy "Recipients can update anonymous scripts"
+  on public.anonymous_scripts for update
+  to authenticated
+  using (auth.uid() = recipient_id)
+  with check (auth.uid() = recipient_id);
+
+drop policy if exists "Recipients can delete anonymous scripts" on public.anonymous_scripts;
+create policy "Recipients can delete anonymous scripts"
+  on public.anonymous_scripts for delete
+  to authenticated
+  using (auth.uid() = recipient_id);
 
 update public.profiles
 set director_eligible = true

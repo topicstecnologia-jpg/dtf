@@ -84,6 +84,18 @@ export interface Community {
   createdAt: number;
 }
 
+export interface AnonymousScript {
+  id: string;
+  recipientId: string;
+  mode: 'instant' | '24h';
+  title: string;
+  sceneHeading: string;
+  body: string;
+  readAt?: number;
+  expiresAt: number;
+  timestamp: number;
+}
+
 export interface Story {
   id: string;
   userId: string;
