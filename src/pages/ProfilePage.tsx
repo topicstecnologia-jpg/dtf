@@ -38,6 +38,7 @@ export const ProfilePage: React.FC = () => {
   const [selectedMovieInfo, setSelectedMovieInfo] = useState<typeof MOVIES[number] | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsView, setSettingsView] = useState<'menu' | 'saved' | 'liked' | 'help'>('menu');
+  const [confirmDialog, setConfirmDialog] = useState<'delete-account' | 'delete-post' | null>(null);
 
   const decodedParam = userId ? decodeURIComponent(userId) : '';
   const isCurrentUser = !userId || userId === currentUser?.id || decodedParam.toLowerCase() === currentUser?.handle?.toLowerCase();
@@ -222,8 +223,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm('Tem certeza que deseja excluir sua conta? Essa ação não pode ser desfeita.');
-    if (!confirmed) return;
+    setConfirmDialog(null);
 
     setIsSaving(true);
     setEditError('');
@@ -265,8 +265,7 @@ export const ProfilePage: React.FC = () => {
 
   const handleDeletePost = async () => {
     if (!liveSelectedPost) return;
-    const confirmed = window.confirm('Excluir esta postagem? Essa ação não pode ser desfeita.');
-    if (!confirmed) return;
+    setConfirmDialog(null);
 
     setIsSavingPost(true);
     setPostActionError('');
@@ -612,7 +611,10 @@ export const ProfilePage: React.FC = () => {
                     <button
                       type="button"
                       disabled={isSavingPost}
-                      onClick={handleDeletePost}
+                      onClick={() => {
+                        setConfirmDialog('delete-post');
+                        setIsPostMenuOpen(false);
+                      }}
                       className="w-full rounded-xl px-3 py-2 text-left text-sm text-red-300 hover:bg-red-500/10 disabled:opacity-60"
                     >
                       Excluir post
@@ -1204,7 +1206,7 @@ export const ProfilePage: React.FC = () => {
               <button
                 type="button"
                 disabled={isSaving}
-                onClick={handleDeleteAccount}
+                onClick={() => setConfirmDialog('delete-account')}
                 className="w-full h-12 rounded-full border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-60 font-bold transition-colors flex items-center justify-center gap-2"
               >
                 <Trash2 size={17} />
@@ -1212,6 +1214,45 @@ export const ProfilePage: React.FC = () => {
               </button>
             </div>
           </motion.form>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-sm flex items-center justify-center p-5">
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="w-full max-w-sm rounded-[28px] border border-white/10 bg-[#1F1F24] p-6 shadow-2xl"
+          >
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10 text-red-300">
+              <Trash2 size={22} />
+            </div>
+            <h2 className="text-2xl font-bold text-white">
+              {confirmDialog === 'delete-account' ? 'Excluir conta?' : 'Excluir postagem?'}
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+              {confirmDialog === 'delete-account'
+                ? 'Essa ação remove sua conta e não pode ser desfeita.'
+                : 'Essa publicação será removida do seu perfil e do feed.'}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="flex-1 h-12 rounded-full bg-zinc-800 text-sm font-bold text-white hover:bg-zinc-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isSaving || isSavingPost}
+                onClick={confirmDialog === 'delete-account' ? handleDeleteAccount : handleDeletePost}
+                className="flex-1 h-12 rounded-full bg-red-500/20 text-sm font-bold text-red-200 hover:bg-red-500/30 disabled:opacity-60"
+              >
+                {isSaving || isSavingPost ? 'Excluindo...' : 'Excluir'}
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

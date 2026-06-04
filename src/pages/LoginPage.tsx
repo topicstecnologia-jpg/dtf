@@ -9,7 +9,7 @@ type AuthMode = 'login' | 'signup' | 'forgot';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, signUp, resendConfirmation, requestPasswordReset, authError } = useApp();
+  const { user, isLoading: isAuthLoading, login, signUp, resendConfirmation, requestPasswordReset, authError } = useApp();
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
@@ -31,6 +31,12 @@ export const LoginPage: React.FC = () => {
       setMode('signup');
     }
   }, []);
+
+  useEffect(() => {
+    if (!isAuthLoading && user) {
+      navigate(user.onboardingCompleted ? '/home' : '/onboarding', { replace: true });
+    }
+  }, [isAuthLoading, user, navigate]);
 
   const resetFeedback = () => {
     setLocalError('');

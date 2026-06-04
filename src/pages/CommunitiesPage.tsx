@@ -204,17 +204,37 @@ export const CommunitiesPage: React.FC = () => {
     <div className="min-h-screen bg-[#17171B] text-white pb-28">
       <div className="sticky top-0 z-40 border-b border-white/5 bg-[#17171B]/90 px-4 py-4 backdrop-blur-xl">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#E4B5C2]">Diretor</p>
-            <h1 className="text-2xl font-bold">Comunidades</h1>
-          </div>
-          <div className="rounded-full bg-[#3F1521] p-3">
-            <Clapperboard size={22} />
-          </div>
+          {selectedCommunity ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setSelectedCommunityId('')}
+                className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-sm font-bold text-zinc-200"
+              >
+                <ArrowLeft size={16} />
+                Voltar
+              </button>
+              <div className="min-w-0 text-right">
+                <p className="truncate text-sm font-bold">{selectedCommunity.name}</p>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#E4B5C2]">Comunidade</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#E4B5C2]">Diretor</p>
+                <h1 className="text-2xl font-bold">Comunidades</h1>
+              </div>
+              <div className="rounded-full bg-[#3F1521] p-3">
+                <Clapperboard size={22} />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="space-y-5 p-4">
+      <div className={selectedCommunity ? 'space-y-0' : 'space-y-5 p-4'}>
+        {!selectedCommunity && (
         <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#222226]">
           <div className="relative min-h-[220px] p-5">
             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1517602302552-471fe67acf66?auto=format&fit=crop&w=1200&q=80')] bg-cover bg-center opacity-30" />
@@ -253,8 +273,9 @@ export const CommunitiesPage: React.FC = () => {
             </div>
           </div>
         </section>
+        )}
 
-        {user?.directorEligible && !directorCommunity && (
+        {!selectedCommunity && user?.directorEligible && !directorCommunity && (
           <button
             type="button"
             onClick={() => {
@@ -309,24 +330,13 @@ export const CommunitiesPage: React.FC = () => {
         )}
 
         {selectedCommunity && (
-          <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#222226]">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <button
-                type="button"
-                onClick={() => setSelectedCommunityId('')}
-                className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-sm font-bold text-zinc-200"
-              >
-                <ArrowLeft size={16} />
-                Comunidades
-              </button>
-              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#E4B5C2]">Feed da comunidade</span>
-            </div>
-            <div className="relative h-56 bg-zinc-900">
+          <section className="min-h-screen bg-[#17171B]">
+            <div className="relative h-[310px] bg-zinc-900">
               {selectedCommunity.coverUrl && <img src={selectedCommunity.coverUrl} alt={selectedCommunity.name} className="h-full w-full object-cover" />}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#222226] via-black/45 to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-4">
+              <div className="absolute inset-0 bg-gradient-to-t from-[#17171B] via-black/50 to-black/15" />
+              <div className="absolute bottom-6 left-5 right-5 flex items-end justify-between gap-4">
                 <div className="flex min-w-0 items-end gap-3">
-                  <div className="h-16 w-16 overflow-hidden rounded-3xl border border-white/15 bg-[#3F1521]">
+                  <div className="h-20 w-20 overflow-hidden rounded-[28px] border border-white/15 bg-[#3F1521] shadow-2xl">
                     {selectedCommunity.avatarUrl ? (
                       <img src={selectedCommunity.avatarUrl} alt={selectedCommunity.name} className="h-full w-full object-cover" />
                     ) : (
@@ -334,7 +344,7 @@ export const CommunitiesPage: React.FC = () => {
                     )}
                   </div>
                   <div className="min-w-0">
-                    <h2 className="truncate text-2xl font-bold">{selectedCommunity.name}</h2>
+                    <h2 className="truncate text-3xl font-bold">{selectedCommunity.name}</h2>
                     <p className="text-xs text-zinc-400">{selectedCommunity.memberIds.length} membros</p>
                   </div>
                 </div>
@@ -346,7 +356,7 @@ export const CommunitiesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-5 p-4">
+            <div className="space-y-5 px-4 py-5">
               <p className="text-sm leading-relaxed text-zinc-300">{selectedCommunity.description}</p>
 
               {selectedCommunity.features.cineLive && (
