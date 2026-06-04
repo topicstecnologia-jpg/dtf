@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Play, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon, Clapperboard, Sparkles } from 'lucide-react';
+import { Home, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon, Clapperboard, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -23,7 +23,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   const navItems = [
     { path: '/home', icon: Home, label: 'Início' },
-    { path: '/feed', icon: Play, label: 'Recomendações' },
     { path: '/communities', icon: Clapperboard, label: 'Comunidades' },
     { path: '/matches', icon: MessageCircle, label: 'Conversas' },
     { path: '/profile', icon: User, label: 'Perfil' },
@@ -112,7 +111,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       {!isChatPage && (
-        <nav className="fixed bottom-5 left-5 right-5 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[460px] h-16 md:h-14 bg-[#222226]/90 backdrop-blur-xl rounded-full shadow-2xl flex items-center justify-between px-4 md:px-5 z-50 border border-white/10">
+        <nav className="fixed bottom-5 left-5 right-5 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[430px] h-16 md:h-14 bg-[#222226]/90 backdrop-blur-xl rounded-full shadow-2xl flex items-center justify-between px-5 md:px-5 z-50 border border-white/10">
           {navItems.slice(0, 2).map((item) => {
             const isActive = pathname === item.path;
             return (

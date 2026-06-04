@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type, Search, Camera, Image as ImageIcon, Trash2, Bell, Repeat2 } from 'lucide-react';
+import { Plus, Heart, MessageCircle, Share2, MoreHorizontal, X, Send, Bookmark, Type, Search, Camera, Image as ImageIcon, Trash2, Bell, Repeat2, Clapperboard, Film } from 'lucide-react';
 import { MOVIES } from '../data/mock';
 import { useApp } from '../context/AppContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,8 +8,8 @@ import { Post, Story } from '../types';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, posts, stories, matches, sendMessage, addComment, startChat, toggleLikeStory, recordStoryView, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory } = useApp();
-  const [activeTab, setActiveTab] = useState('Community');
+  const { user, posts, stories, matches, sendMessage, addComment, startChat, toggleLikeStory, recordStoryView, toggleSavePost, toggleLikePost, repostPost, profileUsers, getUserById, createStory, deleteStory, communities } = useApp();
+  const [activeTab, setActiveTab] = useState('Feed');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [isComposingScene, setIsComposingScene] = useState(false);
@@ -38,7 +38,7 @@ export const HomePage: React.FC = () => {
   const otherUserScenes = latestStoriesByUser.filter(story => story.userId !== user?.id);
   const selectedStoryIndex = liveSelectedStory ? latestStoriesByUser.findIndex(story => story.id === liveSelectedStory.id) : -1;
 
-  const tabs = ['Feed', 'Community'];
+  const tabs = ['Feed', 'Recomendações', 'Comunidades'];
   const searchTerm = profileSearch.trim().toLowerCase();
   const searchedProfiles = searchTerm
     ? profileUsers
@@ -535,68 +535,77 @@ export const HomePage: React.FC = () => {
 
       {/* Main Content */}
       <div className="px-4 space-y-5">
-        {activeTab === 'Community' ? (
-          <>
-            {/* Featured Card (NestCircle style) */}
-            <motion.div 
+        {activeTab === 'Recomendações' ? (
+          <div className="space-y-5 md:max-w-[390px] md:mx-auto">
+            <motion.button
+              type="button"
+              onClick={() => navigate('/feed')}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="w-full md:max-w-[390px] md:mx-auto aspect-[1080/1450] rounded-[28px] relative overflow-hidden p-6 flex flex-col justify-between"
+              className="w-full aspect-[1080/1450] rounded-[28px] relative overflow-hidden p-6 text-left flex flex-col justify-between border border-white/10 bg-[#222226]"
             >
-              {/* Gradient Background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-[#FF9A9E] via-[#FECFEF] to-[#A18CD1] opacity-90" />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20" />
-              
-              {/* Content */}
-              <div className="relative z-10 flex-1 flex items-center justify-center">
-                 {/* Avatar Cluster */}
-                 <div className="relative w-56 h-56">
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-20">
-                      <img src={(profileUsers[0] || user)?.avatarUrl} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="absolute top-12 left-4 w-20 h-20 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-10">
-                      <img src={(profileUsers[1] || user)?.avatarUrl} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="absolute top-12 right-4 w-20 h-20 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-10">
-                      <img src={(profileUsers[2] || user)?.avatarUrl} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="absolute bottom-4 left-10 w-16 h-16 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-30">
-                      <img src={(profileUsers[3] || user)?.avatarUrl} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="absolute bottom-4 right-10 w-16 h-16 rounded-full border-4 border-white/20 overflow-hidden shadow-xl z-30">
-                      <img src={(profileUsers[4] || user)?.avatarUrl} className="w-full h-full object-cover" />
-                    </div>
-                 </div>
+              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=1200&q=80')] bg-cover bg-center opacity-40" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-[#17171B]/55 to-[#17171B]" />
+              <div className="relative z-10 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-black">
+                <Film size={24} />
               </div>
-
-              <div className="relative z-10 flex items-end justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-1">CineClub</h2>
-                  <p className="text-white/80 font-medium">Comunidade</p>
+              <div className="relative z-10">
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[#E4B5C2]">Recomendações</p>
+                <h2 className="text-3xl font-bold leading-tight text-white">Descubra filmes de romance para o seu perfil.</h2>
+                <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+                  Abra o fluxo de recomendações, curta filmes e alimente sua compatibilidade.
+                </p>
+                <span className="mt-6 inline-flex rounded-full bg-white px-5 py-3 text-sm font-bold text-black">
+                  Ver recomendações
+                </span>
+              </div>
+            </motion.button>
+          </div>
+        ) : activeTab === 'Comunidades' ? (
+          <div className="md:max-w-[390px] md:mx-auto space-y-4">
+            {communities.map(community => (
+              <motion.button
+                key={community.id}
+                type="button"
+                onClick={() => navigate(`/communities?community=${community.id}`)}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full overflow-hidden rounded-[28px] border border-white/10 bg-[#222226] text-left"
+              >
+                <div className="relative h-44 bg-zinc-900">
+                  {community.coverUrl && (
+                    <img src={community.coverUrl} alt={community.name} className="h-full w-full object-cover" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#222226] via-black/45 to-transparent" />
+                  <div className="absolute bottom-4 left-4 flex items-end gap-3">
+                    <div className="h-14 w-14 overflow-hidden rounded-2xl border border-white/15 bg-[#3F1521]">
+                      {community.avatarUrl ? (
+                        <img src={community.avatarUrl} alt={community.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-xl font-bold text-white">
+                          {community.name.charAt(0)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-white">{community.name}</h2>
+                      <p className="text-xs text-zinc-400">{community.memberIds.length} membros</p>
+                    </div>
+                  </div>
                 </div>
-                <button className="px-6 py-3 bg-[#17171B]/80 backdrop-blur-md text-white rounded-full font-semibold text-sm hover:bg-[#17171B] transition-colors shadow-lg">
-                  Entrar agora
-                </button>
-              </div>
-            </motion.div>
-
-            {/* Secondary Card */}
-            <div className="w-full md:max-w-[390px] md:mx-auto aspect-[1080/1450] rounded-[28px] relative overflow-hidden p-6 bg-[#B4F8C8] text-[#17171B]">
-               <div className="absolute top-0 right-0 w-64 h-64 bg-[#A0E7E5] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-               <div className="relative z-10">
-                 <h3 className="text-2xl font-bold mb-2">Tendências</h3>
-                 <p className="opacity-70 mb-6">Filmes em alta esta semana</p>
-                 
-                 <div className="flex -space-x-4">
-                   {[1,2,3].map((i) => (
-                     <div key={i} className="w-16 h-24 rounded-xl bg-gray-800 border-2 border-[#B4F8C8] overflow-hidden shadow-lg transform rotate-3 hover:rotate-0 transition-transform duration-300">
-                        <img src={`https://picsum.photos/seed/movie${i}/200/300`} className="w-full h-full object-cover" />
-                     </div>
-                   ))}
-                 </div>
-               </div>
-            </div>
-          </>
+                <div className="p-4">
+                  <p className="line-clamp-2 text-sm leading-relaxed text-zinc-300">{community.description}</p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#E4B5C2]">
+                      <Clapperboard size={14} />
+                      Abrir comunidade
+                    </span>
+                    <span className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black">Entrar</span>
+                  </div>
+                </div>
+              </motion.button>
+            ))}
+          </div>
         ) : (
           /* Feed Content */
           <div className="space-y-5 md:max-w-[390px] md:mx-auto">

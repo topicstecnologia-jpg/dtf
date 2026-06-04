@@ -42,6 +42,7 @@ interface AppContextType {
   }) => Promise<void>;
   joinCommunity: (communityId: string) => Promise<void>;
   createCommunityPost: (communityId: string, values: { text: string; imageFile?: File | null }) => Promise<void>;
+  updateCommunityLiveUrl: (communityId: string, liveUrl: string) => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
   updatePost: (postId: string, values: { caption: string }) => Promise<void>;
@@ -97,6 +98,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isUserOnline = (userId?: string) => Boolean(userId && onlineUserIds.includes(userId));
 
+  const isDirectorTestHandle = (handle?: string) => {
+    const normalized = (handle || '').replace(/^@/, '').toLowerCase();
+    return normalized === 'omayconfreitas' || normalized === 'omaycondefreitas';
+  };
+
   const markChatRead = (matchId: string) => {
     if (!user) return;
     const chat = chats.find(item => item.matchId === matchId);
@@ -130,6 +136,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const referralCount = useMemo(() => {
     if (!user) return 0;
+    if (isDirectorTestHandle(user.handle)) return 5;
     const joinedUntil = (user.createdAt || Date.now()) + 1000 * 60 * 60 * 24 * 7;
     return profileUsers.filter(profile => (
       profile.referredBy === user.id &&
@@ -450,7 +457,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       profile.referredBy === currentProfile?.id &&
       (profile.createdAt || 0) <= referralWindowEndsAt
     )).length;
-    const shouldBecomeDirector = validReferralCount >= 5;
+    const shouldBecomeDirector = validReferralCount >= 5 || isDirectorTestHandle(currentProfile.handle);
 
     if (shouldBecomeDirector && !currentProfile.directorEligible) {
       currentProfile = { ...currentProfile, directorEligible: true };
@@ -1214,6 +1221,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     )));
   };
 
+  const updateCommunityLiveUrl = async (communityId: string, liveUrl: string) => {
+    if (!user || !supabase) return;
+    const community = communities.find(item => item.id === communityId);
+    if (!community || community.ownerId !== user.id) {
+      throw new Error('Apenas o host da comunidade pode alterar o Cine LIVE.');
+    }
+
+    const nextFeatures = {
+      ...community.features,
+      cineLive: true,
+      cineLiveUrl: liveUrl.trim()
+    };
+
+    const { error } = await supabase
+      .from('communities')
+      .update({ features: nextFeatures })
+      .eq('id', communityId)
+      .eq('owner_id', user.id);
+
+    if (error) throw new Error(error.message);
+
+    setCommunities(prev => prev.map(item => (
+      item.id === communityId ? { ...item, features: nextFeatures } : item
+    )));
+  };
+
   const updateFavoriteMovies = async (movieIds: string[]) => {
     if (!user || !supabase) return;
     const favoriteMovies = movieIds.slice(0, 5);
@@ -1850,6 +1883,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     createCommunity,
     joinCommunity,
     createCommunityPost,
+    updateCommunityLiveUrl,
     toggleFollowUser,
     createPost,
     updatePost,

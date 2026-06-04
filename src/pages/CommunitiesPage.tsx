@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Camera,
@@ -6,6 +6,7 @@ import {
   Clapperboard,
   Copy,
   Crown,
+  ArrowLeft,
   ExternalLink,
   Image as ImageIcon,
   Link as LinkIcon,
@@ -45,16 +46,16 @@ const toEmbedUrl = (url?: string) => {
 export const CommunitiesPage: React.FC = () => {
   const {
     user,
-    profileUsers,
     communities,
     referralCount,
     createCommunity,
     joinCommunity,
     createCommunityPost,
+    updateCommunityLiveUrl,
     getUserById
   } = useApp();
   const [copied, setCopied] = useState(false);
-  const [selectedCommunityId, setSelectedCommunityId] = useState(CINECLUB_ID);
+  const [selectedCommunityId, setSelectedCommunityId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [communityName, setCommunityName] = useState('');
   const [communityDescription, setCommunityDescription] = useState('');
@@ -76,9 +77,12 @@ export const CommunitiesPage: React.FC = () => {
   const [postPreview, setPostPreview] = useState('');
   const [postError, setPostError] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [liveUrlInput, setLiveUrlInput] = useState('');
+  const [liveUrlError, setLiveUrlError] = useState('');
+  const [isSavingLiveUrl, setIsSavingLiveUrl] = useState(false);
 
   const directorCommunity = communities.find(community => community.ownerId === user?.id);
-  const selectedCommunity = communities.find(community => community.id === selectedCommunityId) || communities[0];
+  const selectedCommunity = selectedCommunityId ? communities.find(community => community.id === selectedCommunityId) : undefined;
   const isMember = Boolean(user && selectedCommunity?.memberIds.includes(user.id));
   const isOwner = Boolean(user && selectedCommunity?.ownerId === user.id);
   const referralLink = user ? `${window.location.origin}/?ref=${user.id}` : '';
@@ -88,6 +92,17 @@ export const CommunitiesPage: React.FC = () => {
     const rest = communities.filter(community => community.id !== CINECLUB_ID);
     return cineClub ? [cineClub, ...rest] : rest;
   }, [communities]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const communityId = params.get('community');
+    if (communityId) setSelectedCommunityId(communityId);
+  }, []);
+
+  useEffect(() => {
+    setLiveUrlInput(selectedCommunity?.features.cineLiveUrl || '');
+    setLiveUrlError('');
+  }, [selectedCommunity?.id, selectedCommunity?.features.cineLiveUrl]);
 
   const copyReferralLink = async () => {
     await navigator.clipboard?.writeText(referralLink);
@@ -170,6 +185,21 @@ export const CommunitiesPage: React.FC = () => {
     }
   };
 
+  const handleSaveLiveUrl = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedCommunity) return;
+    setLiveUrlError('');
+    setIsSavingLiveUrl(true);
+
+    try {
+      await updateCommunityLiveUrl(selectedCommunity.id, liveUrlInput);
+    } catch (error) {
+      setLiveUrlError(error instanceof Error ? error.message : 'Não foi possível atualizar o Cine LIVE.');
+    } finally {
+      setIsSavingLiveUrl(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#17171B] text-white pb-28">
       <div className="sticky top-0 z-40 border-b border-white/5 bg-[#17171B]/90 px-4 py-4 backdrop-blur-xl">
@@ -243,6 +273,7 @@ export const CommunitiesPage: React.FC = () => {
           </button>
         )}
 
+        {!selectedCommunity && (
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-bold">Comunidades</h2>
@@ -254,9 +285,7 @@ export const CommunitiesPage: React.FC = () => {
                 key={community.id}
                 type="button"
                 onClick={() => setSelectedCommunityId(community.id)}
-                className={`w-40 shrink-0 overflow-hidden rounded-[24px] border text-left ${
-                  selectedCommunity?.id === community.id ? 'border-[#E4B5C2]/70 bg-white/10' : 'border-white/10 bg-[#222226]'
-                }`}
+                className="w-40 shrink-0 overflow-hidden rounded-[24px] border border-white/10 bg-[#222226] text-left"
               >
                 <div className="relative h-24 bg-zinc-900">
                   {community.coverUrl && <img src={community.coverUrl} alt={community.name} className="h-full w-full object-cover" />}
@@ -277,9 +306,21 @@ export const CommunitiesPage: React.FC = () => {
             ))}
           </div>
         </section>
+        )}
 
         {selectedCommunity && (
           <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[#222226]">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setSelectedCommunityId('')}
+                className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-sm font-bold text-zinc-200"
+              >
+                <ArrowLeft size={16} />
+                Comunidades
+              </button>
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-[#E4B5C2]">Feed da comunidade</span>
+            </div>
             <div className="relative h-56 bg-zinc-900">
               {selectedCommunity.coverUrl && <img src={selectedCommunity.coverUrl} alt={selectedCommunity.name} className="h-full w-full object-cover" />}
               <div className="absolute inset-0 bg-gradient-to-t from-[#222226] via-black/45 to-transparent" />
@@ -334,6 +375,29 @@ export const CommunitiesPage: React.FC = () => {
                     <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-zinc-500">
                       O Diretor ainda não adicionou um link para assistir.
                     </div>
+                  )}
+                  {isOwner && (
+                    <form onSubmit={handleSaveLiveUrl} className="mt-3 space-y-2">
+                      <label className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">
+                        Link da transmissão
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          value={liveUrlInput}
+                          onChange={(event) => setLiveUrlInput(event.target.value)}
+                          className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#17171B] px-4 py-3 text-sm text-white outline-none focus:border-white/25"
+                          placeholder="Cole um link do YouTube, Vimeo ou outro"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isSavingLiveUrl}
+                          className="rounded-full bg-white px-4 py-3 text-sm font-bold text-black disabled:opacity-60"
+                        >
+                          {isSavingLiveUrl ? '...' : 'Salvar'}
+                        </button>
+                      </div>
+                      {liveUrlError && <p className="text-sm text-red-300">{liveUrlError}</p>}
+                    </form>
                   )}
                 </div>
               )}

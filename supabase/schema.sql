@@ -911,4 +911,8 @@ create policy "Users can remove their community posts"
   to authenticated
   using (auth.uid() = user_id);
 
+update public.profiles
+set director_eligible = true
+where lower(trim(leading '@' from handle)) in ('omayconfreitas', 'omaycondefreitas');
+
 notify pgrst, 'reload schema';
