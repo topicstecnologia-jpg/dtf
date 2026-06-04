@@ -66,6 +66,7 @@ const getVideoPreviewUrl = (url?: string) => {
 export const CommunitiesPage: React.FC = () => {
   const {
     user,
+    profileUsers,
     communities,
     referralCount,
     createCommunity,
@@ -134,6 +135,17 @@ export const CommunitiesPage: React.FC = () => {
   const selectedRoomTitle = selectedRoomId === 'cine-live' ? 'Cine LIVE' : selectedGroup?.name || '';
   const visibleAnonymousScripts = anonymousScripts.filter(script => script.mode === '24h');
   const openScript = anonymousScripts.find(script => script.id === openScriptId);
+  const recipientQuery = scriptRecipient.trim().replace(/^@/, '').toLowerCase();
+  const recipientSuggestions = recipientQuery
+    ? profileUsers
+      .filter(profile => profile.id !== user?.id)
+      .filter(profile => {
+        const handle = profile.handle.replace(/^@/, '').toLowerCase();
+        const name = profile.name.toLowerCase();
+        return handle.includes(recipientQuery) || name.includes(recipientQuery);
+      })
+      .slice(0, 5)
+    : [];
   const sortedCommunities = useMemo(() => {
     const cineClub = communities.find(community => community.id === CINECLUB_ID);
     const rest = communities.filter(community => community.id !== CINECLUB_ID);
@@ -879,12 +891,40 @@ export const CommunitiesPage: React.FC = () => {
                 className="w-full rounded-full border border-white/10 bg-[#17171B] px-5 py-4 text-white outline-none focus:border-white/25"
                 placeholder="Título"
               />
-              <input
-                value={scriptRecipient}
-                onChange={(event) => setScriptRecipient(event.target.value)}
-                className="w-full rounded-full border border-white/10 bg-[#17171B] px-5 py-4 text-white outline-none focus:border-white/25"
-                placeholder="@ de quem vai receber"
-              />
+              <div className="space-y-2">
+                <input
+                  value={scriptRecipient}
+                  onChange={(event) => setScriptRecipient(event.target.value)}
+                  className="w-full rounded-full border border-white/10 bg-[#17171B] px-5 py-4 text-white outline-none focus:border-white/25"
+                  placeholder="Nome ou @ de quem vai receber"
+                />
+                {recipientSuggestions.length > 0 && (
+                  <div className="overflow-hidden rounded-[22px] border border-white/10 bg-[#17171B]">
+                    {recipientSuggestions.map(profile => (
+                      <button
+                        key={profile.id}
+                        type="button"
+                        onClick={() => setScriptRecipient(profile.handle)}
+                        className="flex w-full items-center gap-3 border-b border-white/5 px-4 py-3 text-left last:border-b-0 hover:bg-white/5"
+                      >
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-[#3F1521]">
+                          {profile.avatarUrl ? (
+                            <img src={profile.avatarUrl} alt={profile.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-sm font-bold">
+                              {profile.name.charAt(0)}
+                            </div>
+                          )}
+                        </div>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-bold text-white">{profile.name}</span>
+                          <span className="block truncate text-xs text-zinc-500">{profile.handle}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="rounded-[24px] bg-[#F3E8D5] p-5 text-[#17110B] shadow-inner">
                 <p className="mb-4 text-center font-mono text-xs font-bold uppercase tracking-[0.18em] text-[#5C4B3A]">
                   Roteiro anônimo
