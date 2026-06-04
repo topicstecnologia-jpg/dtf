@@ -134,6 +134,7 @@ export interface User {
   referredBy?: string;
   directorEligible?: boolean;
   directorCelebrationSeen?: boolean;
+  lastSeenAt?: number;
   createdAt?: number;
   stats: {
     following: number;

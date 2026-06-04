@@ -48,7 +48,7 @@ export const ProfilePage: React.FC = () => {
       ? profileUsers.find(profile => profile.handle.toLowerCase() === decodedParam.toLowerCase())
       : getUserById(userId);
 
-  if (!profileUser) return <div className="p-8 text-center text-white bg-black min-h-screen">Usuário não encontrado</div>;
+  if (!profileUser) return <div className="p-8 text-center text-white bg-[#17171B] min-h-screen">Usuário não encontrado</div>;
 
   const match = matches.find(m =>
     m.userIds.includes(currentUser?.id || '') &&
@@ -283,8 +283,8 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white pb-24 md:pb-20 md:pt-12">
-      <div className="flex justify-between items-center p-4 sticky top-0 bg-black/95 backdrop-blur-md z-50">
+    <div className="min-h-screen bg-[#17171B] text-white pb-24 md:pb-20 md:pt-12">
+      <div className="flex justify-between items-center p-4 sticky top-0 bg-[#17171B]/95 backdrop-blur-md z-50">
         <button onClick={() => navigate(-1)} className="p-2">
           <ArrowLeft size={22} />
         </button>
@@ -313,10 +313,10 @@ export const ProfilePage: React.FC = () => {
             <img
               src={profileUser.avatarUrl}
               alt={profileUser.name}
-              className="w-24 h-24 md:w-20 md:h-20 rounded-full object-cover border-2 border-black"
+              className="w-24 h-24 md:w-20 md:h-20 rounded-full object-cover border-2 border-[#17171B]"
             />
           ) : (
-            <div className="w-24 h-24 md:w-20 md:h-20 rounded-full bg-[#3F1521] border-2 border-black flex items-center justify-center text-3xl md:text-2xl font-bold">
+            <div className="w-24 h-24 md:w-20 md:h-20 rounded-full bg-[#3F1521] border-2 border-[#17171B] flex items-center justify-center text-3xl md:text-2xl font-bold">
               {profileUser.name.charAt(0).toUpperCase()}
             </div>
           )}

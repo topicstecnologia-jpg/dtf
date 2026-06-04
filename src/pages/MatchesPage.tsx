@@ -1,11 +1,48 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { MessageCircle, Search } from 'lucide-react';
+import { MessageCircle, Search, X } from 'lucide-react';
+
+const formatTime = (timestamp?: number) => (
+  timestamp
+    ? new Date(timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : ''
+);
 
 export const MatchesPage: React.FC = () => {
-  const { matches, chats, user, getUserById, getUnreadMessagesForMatch, isUserOnline, markChatRead } = useApp();
+  const {
+    matches,
+    chats,
+    user,
+    getUserById,
+    getUnreadMessagesForMatch,
+    getChatReadAt,
+    isUserOnline,
+    markChatRead
+  } = useApp();
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const conversationItems = useMemo(() => (
+    matches
+      .map(match => {
+        const otherUserId = match.userIds.find(id => id !== user?.id);
+        const otherUser = getUserById(otherUserId);
+        const chat = chats.find(item => item.matchId === match.id);
+        const lastMessage = chat?.messages[chat.messages.length - 1];
+        const lastActivity = lastMessage?.timestamp || match.timestamp;
+        return { match, otherUserId, otherUser, chat, lastMessage, lastActivity };
+      })
+      .filter(item => item.otherUser)
+      .filter(item => {
+        const query = searchTerm.trim().toLowerCase().replace(/^@/, '');
+        if (!query) return true;
+        const name = item.otherUser?.name.toLowerCase() || '';
+        const handle = item.otherUser?.handle.toLowerCase().replace(/^@/, '') || '';
+        return name.includes(query) || handle.includes(query);
+      })
+      .sort((a, b) => b.lastActivity - a.lastActivity)
+  ), [matches, chats, profileKey(user?.id, searchTerm)]);
 
   const openChat = (matchId: string) => {
     markChatRead(matchId);
@@ -13,132 +50,134 @@ export const MatchesPage: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 h-full flex flex-col">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-display font-bold text-text-main">Conversas</h1>
-        <button className="p-2 bg-white rounded-full shadow-sm text-gray-400">
-          <Search size={20} />
-        </button>
-      </div>
+    <div className="min-h-screen bg-[#17171B] px-4 pb-28 pt-4 text-white">
+      <div className="sticky top-0 z-30 -mx-4 border-b border-white/5 bg-[#17171B]/95 px-4 pb-4 pt-2 backdrop-blur-xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-3xl font-display font-bold text-white">Conversas</h1>
+          <div className="rounded-full bg-[#222226] p-3 text-zinc-300">
+            <MessageCircle size={21} />
+          </div>
+        </div>
 
-      <div className="space-y-2">
-        <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-hide">
-          {matches.length === 0 ? (
-            <div className="flex flex-col items-center space-y-1 min-w-[70px]">
-              <div className="w-16 h-16 rounded-full bg-gray-200 border-2 border-dashed border-gray-300 flex items-center justify-center">
-                <span className="text-xs text-gray-400">Vazio</span>
-              </div>
-            </div>
-          ) : (
-            matches.map((match) => {
-              const otherUserId = match.userIds.find(id => id !== user?.id);
-              const otherUser = getUserById(otherUserId);
-              const isOnline = isUserOnline(otherUserId);
-              const unreadCount = getUnreadMessagesForMatch(match.id);
-              if (!otherUser) return null;
-
-              return (
-                <div
-                  key={match.id}
-                  className="flex flex-col items-center space-y-1 min-w-[70px] cursor-pointer"
-                  onClick={() => openChat(match.id)}
-                >
-                  <div className="relative">
-                    {otherUser.avatarUrl ? (
-                      <img
-                        src={otherUser.avatarUrl}
-                        alt={otherUser.name}
-                        className="w-16 h-16 rounded-full object-cover border-2 border-blue-400 p-0.5"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 rounded-full bg-[#3F1521] border-2 border-blue-400 flex items-center justify-center text-white font-bold">
-                        {otherUser.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    {isOnline && (
-                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white" />
-                    )}
-                    {unreadCount > 0 && (
-                      <div className="absolute -top-1 -right-1 min-w-5 h-5 rounded-full bg-red-500 px-1 text-[10px] text-white font-bold flex items-center justify-center">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-xs font-medium text-text-main truncate w-full text-center">{otherUser.name}</span>
-                </div>
-              );
-            })
+        <div className="relative">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="h-12 w-full rounded-full border border-white/10 bg-[#222226] pl-11 pr-11 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-white/25"
+            placeholder="Pesquisar conversas"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/5 p-1.5 text-zinc-400"
+            >
+              <X size={15} />
+            </button>
           )}
         </div>
       </div>
 
-      <div className="flex-1 space-y-4">
-        <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Mensagens</h2>
+      {conversationItems.length > 0 && (
+        <div className="mt-5 flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+          {conversationItems.map(({ match, otherUser, otherUserId }) => {
+            const isOnline = isUserOnline(otherUserId);
+            if (!otherUser) return null;
 
-        {matches.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-center bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-            <MessageCircle size={32} className="text-gray-300 mb-2" />
-            <p className="text-gray-400 text-sm">Nenhuma conversa ainda.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {matches.map((match) => {
-              const otherUserId = match.userIds.find(id => id !== user?.id);
-              const otherUser = getUserById(otherUserId);
-              const isOnline = isUserOnline(otherUserId);
-              const unreadCount = getUnreadMessagesForMatch(match.id);
-              const chat = chats.find(item => item.matchId === match.id);
-              const lastMessage = chat?.messages[chat.messages.length - 1];
-              if (!otherUser) return null;
-
-              return (
-                <div
-                  key={match.id}
-                  className="bg-white rounded-2xl p-4 flex items-center space-x-4 shadow-sm border border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => openChat(match.id)}
-                >
-                  <div className="relative">
-                    {otherUser.avatarUrl ? (
-                      <img
-                        src={otherUser.avatarUrl}
-                        alt={otherUser.name}
-                        className="w-14 h-14 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-14 h-14 rounded-full bg-[#3F1521] flex items-center justify-center text-white font-bold">
-                        {otherUser.name.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    {isOnline && (
-                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white" />
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-start gap-3 mb-1">
-                      <h3 className="text-base font-bold text-text-main truncate">{otherUser.name}</h3>
-                      <span className="text-xs text-gray-400 shrink-0">
-                        {lastMessage ? new Date(lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-500 truncate">
-                      <span className="font-semibold text-gray-700">{otherUser.handle}</span>
-                      <span className="mx-1">.</span>
-                      {lastMessage?.text || (lastMessage?.mediaType === 'audio' ? 'Áudio' : lastMessage?.mediaType ? 'Mídia' : 'Vocês deram match! Diga oi.')}
-                    </p>
-                  </div>
-
-                  {unreadCount > 0 && (
-                    <div className="min-w-5 h-5 bg-blue-500 rounded-full px-1 flex items-center justify-center text-[10px] text-white font-bold">
-                      {unreadCount > 9 ? '9+' : unreadCount}
+            return (
+              <button
+                key={match.id}
+                type="button"
+                className="flex min-w-[74px] flex-col items-center gap-2"
+                onClick={() => openChat(match.id)}
+              >
+                <div className="relative">
+                  {otherUser.avatarUrl ? (
+                    <img src={otherUser.avatarUrl} alt={otherUser.name} className="h-16 w-16 rounded-full border border-white/10 object-cover" />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-[#3F1521] text-lg font-bold text-white">
+                      {otherUser.name.charAt(0).toUpperCase()}
                     </div>
                   )}
+                  {isOnline && <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[#17171B] bg-green-500" />}
                 </div>
-              );
-            })}
+                <span className="w-20 truncate text-center text-xs font-medium text-zinc-300">{otherUser.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-5 space-y-3">
+        {conversationItems.length === 0 ? (
+          <div className="flex h-44 flex-col items-center justify-center rounded-[26px] border border-white/10 bg-[#222226] p-6 text-center">
+            <MessageCircle size={32} className="mb-3 text-zinc-500" />
+            <p className="text-sm text-zinc-400">{searchTerm ? 'Nenhuma conversa encontrada.' : 'Nenhuma conversa ainda.'}</p>
           </div>
-        )}
+        ) : conversationItems.map(({ match, otherUser, otherUserId, lastMessage }) => {
+          if (!otherUser) return null;
+          const isOnline = isUserOnline(otherUserId);
+          const unreadCount = getUnreadMessagesForMatch(match.id);
+          const readAt = getChatReadAt(match.id, otherUserId);
+          const lastMessageText = lastMessage?.text || (
+            lastMessage?.mediaType === 'audio'
+              ? 'Áudio'
+              : lastMessage?.mediaType
+                ? 'Mídia'
+                : 'Vocês deram match! Diga oi.'
+          );
+          const statusText = isOnline
+            ? 'online'
+            : otherUser.lastSeenAt
+              ? `visto por último às ${formatTime(otherUser.lastSeenAt)}`
+              : 'offline';
+          const readText = lastMessage && lastMessage.senderId === user?.id && readAt >= lastMessage.timestamp
+            ? `lida às ${formatTime(readAt)}`
+            : statusText;
+
+          return (
+            <button
+              key={match.id}
+              type="button"
+              className="flex w-full items-center gap-3 rounded-[24px] border border-white/10 bg-[#222226] p-4 text-left transition-colors hover:bg-[#2A2A30]"
+              onClick={() => openChat(match.id)}
+            >
+              <div className="relative shrink-0">
+                {otherUser.avatarUrl ? (
+                  <img src={otherUser.avatarUrl} alt={otherUser.name} className="h-14 w-14 rounded-full object-cover" />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#3F1521] font-bold text-white">
+                    {otherUser.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                {isOnline && <div className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-[#222226] bg-green-500" />}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-bold text-white">{otherUser.name}</h3>
+                    <p className="truncate text-xs text-[#E4B5C2]">{readText}</p>
+                  </div>
+                  <span className="shrink-0 text-xs text-zinc-500">{formatTime(lastMessage?.timestamp)}</span>
+                </div>
+                <p className={`truncate text-sm ${unreadCount > 0 ? 'font-semibold text-white' : 'text-zinc-400'}`}>
+                  {lastMessageText}
+                </p>
+              </div>
+
+              {unreadCount > 0 && (
+                <div className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </div>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 };
+
+const profileKey = (userId?: string, searchTerm = '') => `${userId || ''}:${searchTerm}`;

@@ -19,6 +19,7 @@ create table if not exists public.profiles (
   referred_by uuid references public.profiles(id) on delete set null,
   director_eligible boolean not null default false,
   director_celebration_seen boolean not null default false,
+  last_seen_at timestamptz,
   stats jsonb not null default '{"following":0,"followers":0,"creations":0}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -51,6 +52,13 @@ create table if not exists public.message_reactions (
   emoji text not null,
   created_at timestamptz not null default now(),
   primary key (message_id, user_id)
+);
+
+create table if not exists public.chat_read_receipts (
+  match_id uuid not null references public.matches(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  read_at timestamptz not null default now(),
+  primary key (match_id, user_id)
 );
 
 create table if not exists public.posts (
@@ -210,6 +218,9 @@ alter table public.profiles
 
 alter table public.profiles
   add column if not exists director_celebration_seen boolean not null default false;
+
+alter table public.profiles
+  add column if not exists last_seen_at timestamptz;
 
 alter table public.stories
   add column if not exists expires_at timestamptz not null default (now() + interval '24 hours');
@@ -432,6 +443,18 @@ begin
       from pg_publication_tables
       where pubname = 'supabase_realtime'
       and schemaname = 'public'
+      and tablename = 'chat_read_receipts'
+    )
+  then
+    alter publication supabase_realtime add table public.chat_read_receipts;
+  end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
       and tablename = 'message_reactions'
     )
   then
@@ -645,6 +668,7 @@ alter table public.profiles enable row level security;
 alter table public.matches enable row level security;
 alter table public.messages enable row level security;
 alter table public.message_reactions enable row level security;
+alter table public.chat_read_receipts enable row level security;
 alter table public.posts enable row level security;
 alter table public.stories enable row level security;
 alter table public.comments enable row level security;
@@ -761,6 +785,38 @@ create policy "Users can remove their message reactions"
   on public.message_reactions for delete
   to authenticated
   using (auth.uid() = user_id);
+
+drop policy if exists "Users can read chat receipts in their matches" on public.chat_read_receipts;
+create policy "Users can read chat receipts in their matches"
+  on public.chat_read_receipts for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.matches
+      where matches.id = chat_read_receipts.match_id
+      and (matches.user_a = auth.uid() or matches.user_b = auth.uid())
+    )
+  );
+
+drop policy if exists "Users can create their own chat receipts" on public.chat_read_receipts;
+create policy "Users can create their own chat receipts"
+  on public.chat_read_receipts for insert
+  to authenticated
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.matches
+      where matches.id = chat_read_receipts.match_id
+      and (matches.user_a = auth.uid() or matches.user_b = auth.uid())
+    )
+  );
+
+drop policy if exists "Users can update their own chat receipts" on public.chat_read_receipts;
+create policy "Users can update their own chat receipts"
+  on public.chat_read_receipts for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 drop policy if exists "Posts are visible to authenticated users" on public.posts;
 create policy "Posts are visible to authenticated users"

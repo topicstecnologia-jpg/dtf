@@ -85,6 +85,7 @@ interface AppContextType {
   toggleLikePost: (postId: string) => Promise<void>;
   markChatRead: (matchId: string) => void;
   getUnreadMessagesForMatch: (matchId: string) => number;
+  getChatReadAt: (matchId: string, userId?: string) => number;
   isUserOnline: (userId?: string) => boolean;
 }
 
@@ -103,6 +104,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [onlineUserIds, setOnlineUserIds] = useState<string[]>([]);
   const [directorCelebrationOpen, setDirectorCelebrationOpen] = useState(false);
   const [readMessagesByMatch, setReadMessagesByMatch] = useState<Record<string, number>>({});
+  const [chatReadReceipts, setChatReadReceipts] = useState<Record<string, Record<string, number>>>({});
   const [currentMovieIndex, setCurrentMovieIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState('');
@@ -132,6 +134,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(getReadMessagesStorageKey(user.id), JSON.stringify(next));
       return next;
     });
+
+    setChatReadReceipts(prev => ({
+      ...prev,
+      [matchId]: {
+        ...(prev[matchId] || {}),
+        [user.id]: Date.now()
+      }
+    }));
+
+    supabase?.from('chat_read_receipts').upsert({
+      match_id: matchId,
+      user_id: user.id,
+      read_at: new Date().toISOString()
+    }, { onConflict: 'match_id,user_id' }).then(() => undefined);
   };
 
   const unreadMessageCount = useMemo(() => {
@@ -152,6 +168,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       message.senderId !== user.id && message.timestamp > lastReadAt
     )).length || 0;
   };
+
+  const getChatReadAt = (matchId: string, userId?: string) => (
+    userId ? chatReadReceipts[matchId]?.[userId] || 0 : 0
+  );
 
   const referralCount = useMemo(() => {
     if (!user) return 0;
@@ -263,6 +283,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       matchId,
       messages
     })));
+  };
+
+  const loadChatReadReceipts = async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from('chat_read_receipts').select('*');
+    const grouped: Record<string, Record<string, number>> = {};
+
+    (data || []).forEach((row: any) => {
+      grouped[row.match_id] = {
+        ...(grouped[row.match_id] || {}),
+        [row.user_id]: new Date(row.read_at).getTime()
+      };
+    });
+
+    setChatReadReceipts(grouped);
   };
 
   const mapPostRow = (row: any): Post => ({
@@ -501,7 +536,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const refreshAppData = async (currentUserId: string) => {
-    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadPosts(), loadStories(), loadCommunities(), loadAnonymousScripts(currentUserId)]);
+    await Promise.all([loadProfiles(), loadMatches(currentUserId), loadMessages(), loadChatReadReceipts(), loadPosts(), loadStories(), loadCommunities(), loadAnonymousScripts(currentUserId)]);
   };
 
   const syncSession = async () => {
@@ -607,7 +642,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
 
+    const updateLastSeen = () => {
+      const lastSeenAt = new Date().toISOString();
+      realtimeClient
+        .from('profiles')
+        .update({ last_seen_at: lastSeenAt })
+        .eq('id', user.id)
+        .then(() => undefined);
+    };
+
+    updateLastSeen();
+    const lastSeenInterval = window.setInterval(updateLastSeen, 60000);
+    window.addEventListener('beforeunload', updateLastSeen);
+
     return () => {
+      window.clearInterval(lastSeenInterval);
+      window.removeEventListener('beforeunload', updateLastSeen);
+      updateLastSeen();
       realtimeClient.removeChannel(presenceChannel);
     };
   }, [user?.id]);
@@ -822,6 +873,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           patchMessageReaction(row.message_id, row.user_id);
         }
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_read_receipts' },
+        (payload) => {
+          const row = (payload.new || payload.old) as any;
+          if (!row?.match_id || !row?.user_id || !row?.read_at) return;
+          setChatReadReceipts(prev => ({
+            ...prev,
+            [row.match_id]: {
+              ...(prev[row.match_id] || {}),
+              [row.user_id]: new Date(row.read_at).getTime()
+            }
+          }));
+        }
+      )
       .subscribe();
 
     return () => {
@@ -912,15 +978,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'profiles' },
-        () => {
-          loadProfiles();
+        (payload) => {
+          const updatedProfile = mapProfileRowToUser(payload.new as any);
+          setProfileUsers(prev => prev.map(profile => profile.id === updatedProfile.id ? { ...profile, ...updatedProfile } : profile));
+          setUser(prev => prev?.id === updatedProfile.id ? { ...prev, ...updatedProfile } : prev);
         }
       )
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'profiles' },
-        () => {
-          loadProfiles();
+        (payload) => {
+          const newProfile = mapProfileRowToUser(payload.new as any);
+          setProfileUsers(prev => prev.some(profile => profile.id === newProfile.id) ? prev : [newProfile, ...prev]);
         }
       )
       .on(
@@ -1657,6 +1726,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStories([]);
     setCommunities([]);
     setAnonymousScripts([]);
+    setChatReadReceipts({});
   };
 
   const completeOnboarding = async (answers: Record<string, string>) => {
@@ -2263,8 +2333,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toggleLikePost,
     markChatRead,
     getUnreadMessagesForMatch,
+    getChatReadAt,
     isUserOnline
-  }), [user, profileUsers, movies, matches, chats, posts, stories, communities, anonymousScripts, onlineUserIds, unreadMessageCount, referralCount, directorCelebrationOpen, currentMovieIndex, isLoading, authError, readMessagesByMatch]);
+  }), [user, profileUsers, movies, matches, chats, posts, stories, communities, anonymousScripts, onlineUserIds, unreadMessageCount, referralCount, directorCelebrationOpen, currentMovieIndex, isLoading, authError, readMessagesByMatch, chatReadReceipts]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };

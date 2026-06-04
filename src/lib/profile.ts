@@ -41,9 +41,10 @@ export const createDefaultProfile = (id: string, email?: string, name?: string, 
     savedPosts: [],
     followingIds: [],
     referredBy: undefined,
-    directorEligible: false,
-    directorCelebrationSeen: false,
-    createdAt: Date.now(),
+  directorEligible: false,
+  directorCelebrationSeen: false,
+  lastSeenAt: Date.now(),
+  createdAt: Date.now(),
     stats: {
       following: 0,
       followers: 0,
@@ -72,6 +73,7 @@ export const mapProfileRowToUser = (row: any): User => ({
   referredBy: row.referred_by || undefined,
   directorEligible: Boolean(row.director_eligible),
   directorCelebrationSeen: Boolean(row.director_celebration_seen),
+  lastSeenAt: row.last_seen_at ? new Date(row.last_seen_at).getTime() : undefined,
   createdAt: row.created_at ? new Date(row.created_at).getTime() : undefined,
   stats: row.stats || { following: 0, followers: 0, creations: 0 },
   posts: []
@@ -96,5 +98,6 @@ export const mapUserToProfileRow = (user: User) => ({
   referred_by: user.referredBy || null,
   director_eligible: user.directorEligible || false,
   director_celebration_seen: user.directorCelebrationSeen || false,
+  last_seen_at: user.lastSeenAt ? new Date(user.lastSeenAt).toISOString() : null,
   stats: user.stats
 });
