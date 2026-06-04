@@ -323,7 +323,7 @@ export const CommunitiesPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#17171B] text-white pb-28">
+    <div className={`min-h-screen bg-[#17171B] text-white ${selectedRoomId ? 'pb-0' : 'pb-28'}`}>
       <div className="sticky top-0 z-40 border-b border-white/5 bg-[#17171B]/90 px-4 py-4 backdrop-blur-xl">
         <div className="flex items-center justify-between">
           {selectedCommunity ? (
@@ -344,7 +344,7 @@ export const CommunitiesPage: React.FC = () => {
               </button>
               <div className="min-w-0 text-right">
                 <p className="truncate text-sm font-bold">{selectedRoomTitle || selectedCommunity.name}</p>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-[#E4B5C2]">Comunidade</p>
+                {!selectedRoomId && <p className="text-[10px] uppercase tracking-[0.18em] text-[#E4B5C2]">Comunidade</p>}
               </div>
             </>
           ) : (
@@ -459,6 +459,7 @@ export const CommunitiesPage: React.FC = () => {
 
         {selectedCommunity && (
           <section className="min-h-screen bg-[#17171B]">
+            {!selectedRoomId && (
             <div className="relative h-[310px] bg-zinc-900">
               {selectedCommunity.coverUrl && <img src={selectedCommunity.coverUrl} alt={selectedCommunity.name} className="h-full w-full object-cover" />}
               <div className="absolute inset-0 bg-gradient-to-t from-[#17171B] via-black/50 to-black/15" />
@@ -490,8 +491,9 @@ export const CommunitiesPage: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
 
-            <div className={selectedRoomId ? "flex h-[calc(100dvh-4rem)] flex-col px-0 py-0" : "space-y-5 px-4 py-5"}>
+            <div className={selectedRoomId ? "flex h-[calc(100dvh-4.25rem)] flex-col px-0 py-0" : "space-y-5 px-4 py-5"}>
               {selectedRoomId ? (
                 <div className="flex min-h-0 flex-1 flex-col">
                   {selectedRoomId === 'cine-live' && selectedCommunity.features.cineLive && (
