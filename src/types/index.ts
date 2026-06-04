@@ -45,6 +45,16 @@ export interface CommunityPost {
   timestamp: number;
 }
 
+export interface CommunityMessage {
+  id: string;
+  communityId: string;
+  roomId: string;
+  userId?: string;
+  text: string;
+  type: 'message' | 'system';
+  timestamp: number;
+}
+
 export interface CommunityGroup {
   id: string;
   name: string;
@@ -68,6 +78,7 @@ export interface Community {
   groups: CommunityGroup[];
   memberIds: string[];
   posts: CommunityPost[];
+  messages: CommunityMessage[];
   createdAt: number;
 }
 

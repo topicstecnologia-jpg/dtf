@@ -152,6 +152,16 @@ create table if not exists public.community_posts (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.community_messages (
+  id uuid primary key default gen_random_uuid(),
+  community_id uuid not null references public.communities(id) on delete cascade,
+  room_id text not null,
+  user_id uuid references public.profiles(id) on delete set null,
+  text text not null,
+  type text not null default 'message' check (type in ('message', 'system')),
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles
   add column if not exists username_configured boolean not null default false;
 
@@ -504,6 +514,18 @@ begin
   then
     alter publication supabase_realtime add table public.community_posts;
   end if;
+
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+    and not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'community_messages'
+    )
+  then
+    alter publication supabase_realtime add table public.community_messages;
+  end if;
 end;
 $$;
 
@@ -591,6 +613,7 @@ alter table public.story_views enable row level security;
 alter table public.communities enable row level security;
 alter table public.community_members enable row level security;
 alter table public.community_posts enable row level security;
+alter table public.community_messages enable row level security;
 
 drop policy if exists "Profiles are visible to authenticated users" on public.profiles;
 create policy "Profiles are visible to authenticated users"
@@ -910,6 +933,25 @@ create policy "Users can remove their community posts"
   on public.community_posts for delete
   to authenticated
   using (auth.uid() = user_id);
+
+drop policy if exists "Community messages are visible to authenticated users" on public.community_messages;
+create policy "Community messages are visible to authenticated users"
+  on public.community_messages for select
+  to authenticated
+  using (true);
+
+drop policy if exists "Community members can send messages" on public.community_messages;
+create policy "Community members can send messages"
+  on public.community_messages for insert
+  to authenticated
+  with check (
+    (auth.uid() = user_id or type = 'system')
+    and exists (
+      select 1 from public.community_members
+      where community_members.community_id = community_messages.community_id
+      and community_members.user_id = auth.uid()
+    )
+  );
 
 update public.profiles
 set director_eligible = true

@@ -7,6 +7,7 @@ import {
   Copy,
   Crown,
   ArrowLeft,
+  Edit3,
   ExternalLink,
   Image as ImageIcon,
   Link as LinkIcon,
@@ -52,11 +53,17 @@ export const CommunitiesPage: React.FC = () => {
     joinCommunity,
     createCommunityPost,
     updateCommunityLiveUrl,
+    updateCommunity,
+    sendCommunityMessage,
+    enterCommunityRoom,
     getUserById
   } = useApp();
   const [copied, setCopied] = useState(false);
   const [selectedCommunityId, setSelectedCommunityId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditingCommunity, setIsEditingCommunity] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [roomMessage, setRoomMessage] = useState('');
   const [communityName, setCommunityName] = useState('');
   const [communityDescription, setCommunityDescription] = useState('');
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -87,6 +94,9 @@ export const CommunitiesPage: React.FC = () => {
   const isOwner = Boolean(user && selectedCommunity?.ownerId === user.id);
   const referralLink = user ? `${window.location.origin}/?ref=${user.id}` : '';
   const embedUrl = toEmbedUrl(selectedCommunity?.features.cineLiveUrl);
+  const selectedRoomMessages = selectedCommunity?.messages.filter(message => message.roomId === selectedRoomId) || [];
+  const selectedGroup = selectedCommunity?.groups.find(group => group.id === selectedRoomId);
+  const selectedRoomTitle = selectedRoomId === 'cine-live' ? 'Cine LIVE' : selectedGroup?.name || '';
   const sortedCommunities = useMemo(() => {
     const cineClub = communities.find(community => community.id === CINECLUB_ID);
     const rest = communities.filter(community => community.id !== CINECLUB_ID);
@@ -132,6 +142,24 @@ export const CommunitiesPage: React.FC = () => {
     setCreateError('');
   };
 
+  const openEditCommunity = () => {
+    if (!selectedCommunity) return;
+    setCommunityName(selectedCommunity.name);
+    setCommunityDescription(selectedCommunity.description);
+    setCoverFile(null);
+    setAvatarFile(null);
+    setCoverPreview(selectedCommunity.coverUrl || '');
+    setAvatarPreview(selectedCommunity.avatarUrl || '');
+    setFeatures(selectedCommunity.features);
+    setGroupNames([
+      selectedCommunity.groups[0]?.name || 'Geral',
+      selectedCommunity.groups[1]?.name || 'Sessões',
+      selectedCommunity.groups[2]?.name || 'Spoilers'
+    ]);
+    setCreateError('');
+    setIsEditingCommunity(true);
+  };
+
   const handleCreateCommunity = async (event: React.FormEvent) => {
     event.preventDefault();
     setCreateError('');
@@ -150,6 +178,29 @@ export const CommunitiesPage: React.FC = () => {
       setIsCreating(false);
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : 'Não foi possível criar a comunidade.');
+    } finally {
+      setIsSavingCommunity(false);
+    }
+  };
+
+  const handleUpdateCommunity = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedCommunity) return;
+    setCreateError('');
+    setIsSavingCommunity(true);
+
+    try {
+      await updateCommunity(selectedCommunity.id, {
+        name: communityName,
+        description: communityDescription,
+        coverFile,
+        avatarFile,
+        features,
+        groups: groupNames
+      });
+      setIsEditingCommunity(false);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Não foi possível editar a comunidade.');
     } finally {
       setIsSavingCommunity(false);
     }
@@ -200,6 +251,22 @@ export const CommunitiesPage: React.FC = () => {
     }
   };
 
+  const openRoom = async (roomId: string) => {
+    if (!selectedCommunity) return;
+    setSelectedRoomId(roomId);
+    setRoomMessage('');
+    if (roomId === 'cine-live') {
+      await enterCommunityRoom(selectedCommunity.id, roomId);
+    }
+  };
+
+  const handleSendRoomMessage = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!selectedCommunity || !selectedRoomId || !roomMessage.trim()) return;
+    await sendCommunityMessage(selectedCommunity.id, selectedRoomId, roomMessage);
+    setRoomMessage('');
+  };
+
   return (
     <div className="min-h-screen bg-[#17171B] text-white pb-28">
       <div className="sticky top-0 z-40 border-b border-white/5 bg-[#17171B]/90 px-4 py-4 backdrop-blur-xl">
@@ -208,14 +275,20 @@ export const CommunitiesPage: React.FC = () => {
             <>
               <button
                 type="button"
-                onClick={() => setSelectedCommunityId('')}
+                onClick={() => {
+                  if (selectedRoomId) {
+                    setSelectedRoomId('');
+                    return;
+                  }
+                  setSelectedCommunityId('');
+                }}
                 className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-2 text-sm font-bold text-zinc-200"
               >
                 <ArrowLeft size={16} />
                 Voltar
               </button>
               <div className="min-w-0 text-right">
-                <p className="truncate text-sm font-bold">{selectedCommunity.name}</p>
+                <p className="truncate text-sm font-bold">{selectedRoomTitle || selectedCommunity.name}</p>
                 <p className="text-[10px] uppercase tracking-[0.18em] text-[#E4B5C2]">Comunidade</p>
               </div>
             </>
@@ -348,197 +421,255 @@ export const CommunitiesPage: React.FC = () => {
                     <p className="text-xs text-zinc-400">{selectedCommunity.memberIds.length} membros</p>
                   </div>
                 </div>
-                {!isMember && (
-                  <button type="button" onClick={handleJoin} className="rounded-full bg-white px-4 py-2 text-sm font-bold text-black">
-                    Entrar
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {!isMember && (
+                    <button type="button" onClick={handleJoin} className="rounded-full bg-white px-4 py-2 text-sm font-bold text-black">
+                      Entrar
+                    </button>
+                  )}
+                  {isOwner && (
+                    <button type="button" onClick={openEditCommunity} className="rounded-full bg-white/10 p-3 text-white backdrop-blur-md">
+                      <Edit3 size={18} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="space-y-5 px-4 py-5">
-              <p className="text-sm leading-relaxed text-zinc-300">{selectedCommunity.description}</p>
-
-              {selectedCommunity.features.cineLive && (
-                <div className="rounded-[24px] border border-white/10 bg-black/25 p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-bold">Cine LIVE</p>
-                      <p className="text-xs text-zinc-500">Sessão compartilhada por link</p>
-                    </div>
-                    {selectedCommunity.features.cineLiveUrl && (
-                      <a
-                        href={selectedCommunity.features.cineLiveUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-full bg-white/10 p-2 text-white"
-                      >
-                        <ExternalLink size={17} />
-                      </a>
-                    )}
-                  </div>
-                  {embedUrl ? (
-                    <div className="aspect-video overflow-hidden rounded-2xl bg-black">
-                      <iframe src={embedUrl} title="Cine LIVE" className="h-full w-full" allowFullScreen />
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-white/10 p-5 text-sm text-zinc-500">
-                      O Diretor ainda não adicionou um link para assistir.
+              {selectedRoomId ? (
+                <div className="space-y-4">
+                  {selectedRoomId === 'cine-live' && selectedCommunity.features.cineLive && (
+                    <div className="space-y-3">
+                      {embedUrl ? (
+                        <div className="aspect-video overflow-hidden rounded-[24px] bg-black">
+                          <iframe src={embedUrl} title="Cine LIVE" className="h-full w-full" allowFullScreen />
+                        </div>
+                      ) : (
+                        <div className="rounded-[24px] border border-dashed border-white/10 p-6 text-sm text-zinc-500">
+                          O Diretor ainda não adicionou um link.
+                        </div>
+                      )}
+                      {isOwner && (
+                        <form onSubmit={handleSaveLiveUrl} className="space-y-2">
+                          <div className="flex gap-2">
+                            <input
+                              value={liveUrlInput}
+                              onChange={(event) => setLiveUrlInput(event.target.value)}
+                              className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#222226] px-4 py-3 text-sm text-white outline-none focus:border-white/25"
+                              placeholder="Cole o link da transmissão"
+                            />
+                            <button
+                              type="submit"
+                              disabled={isSavingLiveUrl}
+                              className="rounded-full bg-white px-4 py-3 text-sm font-bold text-black disabled:opacity-60"
+                            >
+                              Salvar
+                            </button>
+                          </div>
+                          {liveUrlError && <p className="text-sm text-red-300">{liveUrlError}</p>}
+                        </form>
+                      )}
                     </div>
                   )}
+
+                  <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[#222226]">
+                    <div className="max-h-[42vh] min-h-[260px] space-y-3 overflow-y-auto p-4">
+                      {selectedRoomMessages.length === 0 ? (
+                        <p className="py-12 text-center text-sm text-zinc-500">Nenhuma mensagem ainda.</p>
+                      ) : selectedRoomMessages.map(message => {
+                        const messageUser = message.userId ? getUserById(message.userId) : undefined;
+                        if (message.type === 'system') {
+                          return (
+                            <div key={message.id} className="text-center text-xs font-bold text-[#E4B5C2]">
+                              {message.text}
+                            </div>
+                          );
+                        }
+                        const isMine = message.userId === user?.id;
+                        return (
+                          <div key={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[78%] rounded-2xl px-4 py-3 ${isMine ? 'bg-[#3F1521] text-white' : 'bg-white/8 text-zinc-100'}`}>
+                              {!isMine && <p className="mb-1 text-[11px] font-bold text-[#E4B5C2]">{messageUser?.handle || '@usuario'}</p>}
+                              <p className="break-words text-sm leading-relaxed">{message.text}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <form onSubmit={handleSendRoomMessage} className="flex gap-2 border-t border-white/10 p-3">
+                      <input
+                        value={roomMessage}
+                        onChange={(event) => setRoomMessage(event.target.value)}
+                        className="min-w-0 flex-1 rounded-full bg-[#17171B] px-4 py-3 text-sm text-white outline-none"
+                        placeholder="Escreva uma mensagem"
+                      />
+                      <button type="submit" className="rounded-full bg-white p-3 text-black">
+                        <Send size={18} />
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm leading-relaxed text-zinc-300">{selectedCommunity.description}</p>
+
+                  {selectedCommunity.features.cineLive && (
+                    <button
+                      type="button"
+                      onClick={() => openRoom('cine-live')}
+                      className="w-full overflow-hidden rounded-[24px] border border-white/10 bg-[#222226] text-left"
+                    >
+                      <div className="relative h-32 bg-black">
+                        {selectedCommunity.coverUrl && <img src={selectedCommunity.coverUrl} alt="Cine LIVE" className="h-full w-full object-cover opacity-45" />}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                        <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                          <span className="text-lg font-bold">Cine LIVE</span>
+                          <ExternalLink size={18} />
+                        </div>
+                      </div>
+                    </button>
+                  )}
+
+                  {selectedCommunity.features.groups && (
+                    <div className="grid gap-3">
+                      {selectedCommunity.groups.slice(0, 3).map(group => (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => openRoom(group.id)}
+                          className="flex items-center justify-between rounded-[24px] border border-white/10 bg-[#222226] px-4 py-5 text-left"
+                        >
+                          <span className="flex items-center gap-3">
+                            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#3F1521] text-[#E4B5C2]">
+                              <MessageCircle size={19} />
+                            </span>
+                            <span className="text-base font-bold">{group.name}</span>
+                          </span>
+                          <ExternalLink size={17} className="text-zinc-500" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {isOwner && (
-                    <form onSubmit={handleSaveLiveUrl} className="mt-3 space-y-2">
-                      <label className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-500">
-                        Link da transmissão
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          value={liveUrlInput}
-                          onChange={(event) => setLiveUrlInput(event.target.value)}
-                          className="min-w-0 flex-1 rounded-full border border-white/10 bg-[#17171B] px-4 py-3 text-sm text-white outline-none focus:border-white/25"
-                          placeholder="Cole um link do YouTube, Vimeo ou outro"
-                        />
+                    <div>
+                      <div className="mb-3 flex items-center gap-2">
+                        <Users size={17} className="text-[#E4B5C2]" />
+                        <h3 className="font-bold">Membros</h3>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {selectedCommunity.memberIds.map(memberId => {
+                          const member = getUserById(memberId);
+                          if (!member) return null;
+                          return (
+                            <div key={member.id} className="w-20 shrink-0 text-center">
+                              <div className="mx-auto h-12 w-12 overflow-hidden rounded-full bg-[#3F1521]">
+                                {member.avatarUrl ? (
+                                  <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center font-bold">{member.name.charAt(0)}</div>
+                                )}
+                              </div>
+                              <p className="mt-2 truncate text-[11px] text-zinc-400">{member.handle}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedCommunity.features.posts && isMember && (
+                    <form onSubmit={handleCommunityPost} className="rounded-[24px] border border-white/10 bg-black/25 p-4">
+                      {postPreview && (
+                        <div className="mb-3 aspect-[1080/1450] overflow-hidden rounded-2xl bg-black">
+                          <img src={postPreview} alt="Preview" className="h-full w-full object-cover" />
+                        </div>
+                      )}
+                      <textarea
+                        value={postText}
+                        onChange={(event) => setPostText(event.target.value)}
+                        className="min-h-24 w-full resize-none rounded-3xl border border-white/10 bg-[#17171B] px-4 py-3 text-sm text-white outline-none focus:border-white/25"
+                        placeholder="Publicar na comunidade..."
+                      />
+                      <div className="mt-3 flex items-center gap-2">
+                        <label className="rounded-full bg-white/10 p-3 text-white">
+                          <ImageIcon size={18} />
+                          <input type="file" accept="image/*" className="hidden" onChange={handlePostImage} />
+                        </label>
                         <button
                           type="submit"
-                          disabled={isSavingLiveUrl}
-                          className="rounded-full bg-white px-4 py-3 text-sm font-bold text-black disabled:opacity-60"
+                          disabled={isPosting}
+                          className="flex-1 rounded-full bg-[#3F1521] px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
                         >
-                          {isSavingLiveUrl ? '...' : 'Salvar'}
+                          {isPosting ? 'Publicando...' : 'Publicar'}
                         </button>
                       </div>
-                      {liveUrlError && <p className="text-sm text-red-300">{liveUrlError}</p>}
+                      {postError && <p className="mt-3 text-sm text-red-300">{postError}</p>}
                     </form>
                   )}
-                </div>
-              )}
 
-              {selectedCommunity.features.groups && (
-                <div>
-                  <div className="mb-3 flex items-center gap-2">
-                    <MessageCircle size={17} className="text-[#E4B5C2]" />
-                    <h3 className="font-bold">Grupos</h3>
-                  </div>
-                  <div className="grid gap-2">
-                    {selectedCommunity.groups.slice(0, 3).map(group => (
-                      <div key={group.id} className="flex items-center justify-between rounded-2xl bg-white/[0.04] px-4 py-3">
-                        <span className="text-sm font-bold">{group.name}</span>
-                        <span className="text-xs text-zinc-500">em breve</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {isOwner && (
-                <div>
-                  <div className="mb-3 flex items-center gap-2">
-                    <Users size={17} className="text-[#E4B5C2]" />
-                    <h3 className="font-bold">Membros</h3>
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {selectedCommunity.memberIds.map(memberId => {
-                      const member = getUserById(memberId);
-                      if (!member) return null;
-                      return (
-                        <div key={member.id} className="w-20 shrink-0 text-center">
-                          <div className="mx-auto h-12 w-12 overflow-hidden rounded-full bg-[#3F1521]">
-                            {member.avatarUrl ? (
-                              <img src={member.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center font-bold">{member.name.charAt(0)}</div>
-                            )}
-                          </div>
-                          <p className="mt-2 truncate text-[11px] text-zinc-400">{member.handle}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {selectedCommunity.features.posts && isMember && (
-                <form onSubmit={handleCommunityPost} className="rounded-[24px] border border-white/10 bg-black/25 p-4">
-                  {postPreview && (
-                    <div className="mb-3 aspect-[1080/1450] overflow-hidden rounded-2xl bg-black">
-                      <img src={postPreview} alt="Preview" className="h-full w-full object-cover" />
-                    </div>
-                  )}
-                  <textarea
-                    value={postText}
-                    onChange={(event) => setPostText(event.target.value)}
-                    className="min-h-24 w-full resize-none rounded-3xl border border-white/10 bg-[#17171B] px-4 py-3 text-sm text-white outline-none focus:border-white/25"
-                    placeholder="Publicar na comunidade..."
-                  />
-                  <div className="mt-3 flex items-center gap-2">
-                    <label className="rounded-full bg-white/10 p-3 text-white">
-                      <ImageIcon size={18} />
-                      <input type="file" accept="image/*" className="hidden" onChange={handlePostImage} />
-                    </label>
-                    <button
-                      type="submit"
-                      disabled={isPosting}
-                      className="flex-1 rounded-full bg-[#3F1521] px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
-                    >
-                      {isPosting ? 'Publicando...' : 'Publicar'}
-                    </button>
-                  </div>
-                  {postError && <p className="mt-3 text-sm text-red-300">{postError}</p>}
-                </form>
-              )}
-
-              {selectedCommunity.features.posts && (
-                <div className="space-y-3">
-                  {selectedCommunity.posts.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-zinc-500">Nenhuma publicação na comunidade ainda.</p>
-                  ) : selectedCommunity.posts.map(post => {
-                    const postUser = getUserById(post.userId);
-                    return (
-                      <article key={post.id} className="rounded-[24px] border border-white/10 bg-black/25 p-4">
-                        <div className="mb-3 flex items-center gap-3">
-                          <div className="h-9 w-9 overflow-hidden rounded-full bg-[#3F1521]">
-                            {postUser?.avatarUrl ? (
-                              <img src={postUser.avatarUrl} alt={postUser.name} className="h-full w-full object-cover" />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-sm font-bold">
-                                {postUser?.name.charAt(0) || 'U'}
+                  {selectedCommunity.features.posts && (
+                    <div className="space-y-3">
+                      {selectedCommunity.posts.length === 0 ? (
+                        <p className="py-8 text-center text-sm text-zinc-500">Nenhuma publicação na comunidade ainda.</p>
+                      ) : selectedCommunity.posts.map(post => {
+                        const postUser = getUserById(post.userId);
+                        return (
+                          <article key={post.id} className="rounded-[24px] border border-white/10 bg-black/25 p-4">
+                            <div className="mb-3 flex items-center gap-3">
+                              <div className="h-9 w-9 overflow-hidden rounded-full bg-[#3F1521]">
+                                {postUser?.avatarUrl ? (
+                                  <img src={postUser.avatarUrl} alt={postUser.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center text-sm font-bold">
+                                    {postUser?.name.charAt(0) || 'U'}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold">{postUser?.handle || '@usuario'}</p>
+                                <p className="text-[11px] text-zinc-500">{new Date(post.timestamp).toLocaleDateString('pt-BR')}</p>
+                              </div>
+                            </div>
+                            {post.imageUrl && (
+                              <div className="mb-3 aspect-[1080/1450] overflow-hidden rounded-2xl bg-black">
+                                <img src={post.imageUrl} alt="Post da comunidade" className="h-full w-full object-cover" />
                               </div>
                             )}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold">{postUser?.handle || '@usuario'}</p>
-                            <p className="text-[11px] text-zinc-500">{new Date(post.timestamp).toLocaleDateString('pt-BR')}</p>
-                          </div>
-                        </div>
-                        {post.imageUrl && (
-                          <div className="mb-3 aspect-[1080/1450] overflow-hidden rounded-2xl bg-black">
-                            <img src={post.imageUrl} alt="Post da comunidade" className="h-full w-full object-cover" />
-                          </div>
-                        )}
-                        {post.text && <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-200">{post.text}</p>}
-                      </article>
-                    );
-                  })}
-                </div>
+                            {post.text && <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-200">{post.text}</p>}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>
         )}
       </div>
 
-      {isCreating && (
+      {(isCreating || isEditingCommunity) && (
         <div className="fixed inset-0 z-[132] flex items-end justify-center bg-black/80 p-0 backdrop-blur-sm md:items-center md:p-5">
           <motion.form
-            onSubmit={handleCreateCommunity}
+            onSubmit={isEditingCommunity ? handleUpdateCommunity : handleCreateCommunity}
             initial={{ y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-t-[32px] border border-white/10 bg-[#1F1F24] shadow-2xl md:rounded-[28px]"
           >
             <div className="flex items-center justify-between border-b border-white/10 p-5">
               <div>
-                <h2 className="text-xl font-bold">Criar comunidade</h2>
-                <p className="text-xs text-zinc-500">1 comunidade por Diretor</p>
+                <h2 className="text-xl font-bold">{isEditingCommunity ? 'Editar comunidade' : 'Criar comunidade'}</h2>
               </div>
-              <button type="button" onClick={() => setIsCreating(false)} className="rounded-full bg-white/5 p-2 text-zinc-300">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCreating(false);
+                  setIsEditingCommunity(false);
+                }}
+                className="rounded-full bg-white/5 p-2 text-zinc-300"
+              >
                 <X size={20} />
               </button>
             </div>
@@ -640,7 +771,7 @@ export const CommunitiesPage: React.FC = () => {
                 className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#3F1521] font-bold text-white disabled:opacity-60"
               >
                 <Send size={17} />
-                {isSavingCommunity ? 'Criando...' : 'Criar comunidade'}
+                {isSavingCommunity ? 'Salvando...' : isEditingCommunity ? 'Salvar comunidade' : 'Criar comunidade'}
               </button>
             </div>
           </motion.form>

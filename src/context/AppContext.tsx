@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment, Story, Community, CommunityPost } from '../types';
+import { User, Movie, Match, EmotionalProfileType, Chat, Message, Post, Comment, Story, Community, CommunityPost, CommunityMessage } from '../types';
 import { MOVIES } from '../data/mock';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { createDefaultProfile, mapProfileRowToUser, mapUserToProfileRow, normalizeHandle } from '../lib/profile';
@@ -43,6 +43,16 @@ interface AppContextType {
   joinCommunity: (communityId: string) => Promise<void>;
   createCommunityPost: (communityId: string, values: { text: string; imageFile?: File | null }) => Promise<void>;
   updateCommunityLiveUrl: (communityId: string, liveUrl: string) => Promise<void>;
+  updateCommunity: (communityId: string, values: {
+    name: string;
+    description: string;
+    coverFile?: File | null;
+    avatarFile?: File | null;
+    features: Community['features'];
+    groups: string[];
+  }) => Promise<void>;
+  sendCommunityMessage: (communityId: string, roomId: string, text: string) => Promise<void>;
+  enterCommunityRoom: (communityId: string, roomId: string) => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
   updatePost: (postId: string, values: { caption: string }) => Promise<void>;
@@ -163,6 +173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     ],
     memberIds: user ? [user.id] : [],
     posts: [],
+    messages: [],
     createdAt: Date.now()
   };
 
@@ -301,6 +312,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     timestamp: new Date(row.created_at).getTime()
   });
 
+  const mapCommunityMessageRow = (row: any): CommunityMessage => ({
+    id: row.id,
+    communityId: row.community_id,
+    roomId: row.room_id,
+    userId: row.user_id || undefined,
+    text: row.text || '',
+    type: row.type || 'message',
+    timestamp: new Date(row.created_at).getTime()
+  });
+
   const mapCommunityRow = (row: any): Community => ({
     id: row.id,
     ownerId: row.owner_id || undefined,
@@ -317,6 +338,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     groups: row.groups || [],
     memberIds: (row.community_members || []).map((member: any) => member.user_id),
     posts: (row.community_posts || []).map(mapCommunityPostRow),
+    messages: (row.community_messages || []).map(mapCommunityMessageRow),
     createdAt: new Date(row.created_at).getTime()
   });
 
@@ -406,7 +428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { data, error } = await supabase
       .from('communities')
-      .select('*, community_members(user_id), community_posts(*)')
+      .select('*, community_members(user_id), community_posts(*), community_messages(*)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -909,6 +931,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           loadCommunities();
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'community_messages' },
+        () => {
+          loadCommunities();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -1244,6 +1273,89 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setCommunities(prev => prev.map(item => (
       item.id === communityId ? { ...item, features: nextFeatures } : item
+    )));
+  };
+
+  const updateCommunity = async (communityId: string, values: {
+    name: string;
+    description: string;
+    coverFile?: File | null;
+    avatarFile?: File | null;
+    features: Community['features'];
+    groups: string[];
+  }) => {
+    if (!user || !supabase) return;
+    const community = communities.find(item => item.id === communityId);
+    if (!community || community.ownerId !== user.id) throw new Error('Apenas o Diretor pode editar a comunidade.');
+    if (!values.name.trim()) throw new Error('Informe o nome da comunidade.');
+
+    const coverUrl = values.coverFile ? await uploadCommunityImage(values.coverFile, 'cover') : community.coverUrl || '';
+    const avatarUrl = values.avatarFile ? await uploadCommunityImage(values.avatarFile, 'avatar') : community.avatarUrl || '';
+    const groups = values.features.groups
+      ? values.groups.filter(Boolean).slice(0, 3).map((name, index) => ({ id: community.groups[index]?.id || `group-${index + 1}`, name }))
+      : [];
+
+    const { error } = await supabase
+      .from('communities')
+      .update({
+        name: values.name.trim(),
+        description: values.description.trim(),
+        cover_url: coverUrl,
+        avatar_url: avatarUrl,
+        features: values.features,
+        groups
+      })
+      .eq('id', communityId)
+      .eq('owner_id', user.id);
+
+    if (error) throw new Error(error.message);
+    await loadCommunities();
+  };
+
+  const sendCommunityMessage = async (communityId: string, roomId: string, text: string) => {
+    if (!user || !supabase || !text.trim()) return;
+
+    const { data, error } = await supabase
+      .from('community_messages')
+      .insert({
+        community_id: communityId,
+        room_id: roomId,
+        user_id: user.id,
+        text: text.trim(),
+        type: 'message'
+      })
+      .select('*')
+      .single();
+
+    if (error) throw new Error(error.message);
+    const mappedMessage = mapCommunityMessageRow(data);
+    setCommunities(prev => prev.map(community => (
+      community.id === communityId
+        ? { ...community, messages: [...community.messages, mappedMessage] }
+        : community
+    )));
+  };
+
+  const enterCommunityRoom = async (communityId: string, roomId: string) => {
+    if (!user || !supabase) return;
+    const { data, error } = await supabase
+      .from('community_messages')
+      .insert({
+        community_id: communityId,
+        room_id: roomId,
+        user_id: user.id,
+        text: `${user.name} entrou no Cine LIVE`,
+        type: 'system'
+      })
+      .select('*')
+      .single();
+
+    if (error) return;
+    const mappedMessage = mapCommunityMessageRow(data);
+    setCommunities(prev => prev.map(community => (
+      community.id === communityId
+        ? { ...community, messages: [...community.messages, mappedMessage] }
+        : community
     )));
   };
 
@@ -1884,6 +1996,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     joinCommunity,
     createCommunityPost,
     updateCommunityLiveUrl,
+    updateCommunity,
+    sendCommunityMessage,
+    enterCommunityRoom,
     toggleFollowUser,
     createPost,
     updatePost,
