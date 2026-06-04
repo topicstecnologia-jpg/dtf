@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, MessageCircle, User, AtSign, Plus, X, Image as ImageIcon, Clapperboard, Sparkles, FileText } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { pathname } = useLocation();
-  const { user, unreadMessageCount, updateHandle, createPost, directorCelebrationOpen, dismissDirectorCelebration, anonymousScripts, markAnonymousScriptRead } = useApp();
+  const { user, unreadMessageCount, updateHandle, createPost, directorCelebrationOpen, dismissDirectorCelebration, anonymousScripts, markAnonymousScriptRead, respondToAnonymousScript } = useApp();
   const [handleInput, setHandleInput] = useState(user?.handle?.replace(/^@/, '') || '');
   const [handleError, setHandleError] = useState('');
   const [isSavingHandle, setIsSavingHandle] = useState(false);
@@ -17,8 +17,29 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [postError, setPostError] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [activeScriptId, setActiveScriptId] = useState('');
-  const pendingAnonymousScript = anonymousScripts.find(script => !script.readAt);
+  const [scriptResponseText, setScriptResponseText] = useState('');
+  const [scriptResponseError, setScriptResponseError] = useState('');
+  const [isRespondingToScript, setIsRespondingToScript] = useState(false);
+  const [seenResponseIds, setSeenResponseIds] = useState<string[]>([]);
+  const pendingAnonymousScript = anonymousScripts.find(script => script.recipientId === user?.id && !script.readAt);
+  const pendingScriptResponse = anonymousScripts.find(script => (
+    script.senderId === user?.id &&
+    Boolean(script.responseText) &&
+    !seenResponseIds.includes(script.id)
+  ));
   const activeAnonymousScript = anonymousScripts.find(script => script.id === activeScriptId);
+  const activeScriptIsReceived = activeAnonymousScript?.recipientId === user?.id;
+  const activeScriptIsSentResponse = activeAnonymousScript?.senderId === user?.id && Boolean(activeAnonymousScript?.responseText);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const stored = localStorage.getItem(`dtf:seen-script-responses:${user.id}`);
+      setSeenResponseIds(stored ? JSON.parse(stored) : []);
+    } catch {
+      setSeenResponseIds([]);
+    }
+  }, [user?.id]);
 
   if (!user) {
     return <div className="min-h-screen bg-light-bg text-text-main">{children}</div>;
@@ -81,6 +102,31 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       setPostError(error instanceof Error ? error.message : 'Não foi possível publicar.');
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  const markScriptResponseSeen = (scriptId: string) => {
+    if (!user?.id) return;
+    setSeenResponseIds(prev => {
+      const next = Array.from(new Set([...prev, scriptId]));
+      localStorage.setItem(`dtf:seen-script-responses:${user.id}`, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleRespondToAnonymousScript = async () => {
+    if (!activeAnonymousScript || !scriptResponseText.trim()) return;
+    setScriptResponseError('');
+    setIsRespondingToScript(true);
+
+    try {
+      await respondToAnonymousScript(activeAnonymousScript.id, scriptResponseText);
+      setScriptResponseText('');
+      setActiveScriptId('');
+    } catch (error) {
+      setScriptResponseError(error instanceof Error ? error.message : 'Não foi possível enviar a resposta.');
+    } finally {
+      setIsRespondingToScript(false);
     }
   };
 
@@ -272,7 +318,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       )}
 
       <AnimatePresence>
-        {pendingAnonymousScript && !activeAnonymousScript && (
+        {pendingAnonymousScript && !activeAnonymousScript && !pendingScriptResponse && (
           <div className="fixed inset-0 z-[138] flex items-center justify-center bg-black/70 p-6 backdrop-blur-lg">
             <motion.div
               initial={{ opacity: 0, scale: 0.94, y: 20 }}
@@ -286,10 +332,37 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <h2 className="text-xl font-bold">Você recebeu um roteiro anônimo</h2>
               <button
                 type="button"
-                onClick={() => setActiveScriptId(pendingAnonymousScript.id)}
+                onClick={() => {
+                  setScriptResponseText('');
+                  setScriptResponseError('');
+                  setActiveScriptId(pendingAnonymousScript.id);
+                }}
                 className="mt-5 h-12 w-full rounded-full bg-white font-bold text-black"
               >
                 Abrir
+              </button>
+            </motion.div>
+          </div>
+        )}
+
+        {pendingScriptResponse && !activeAnonymousScript && (
+          <div className="fixed inset-0 z-[138] flex items-center justify-center bg-black/70 p-6 backdrop-blur-lg">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="w-full max-w-sm rounded-[30px] border border-white/10 bg-[#1F1F24] p-6 text-center shadow-2xl"
+            >
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#3F1521] text-[#E4B5C2]">
+                <FileText size={25} />
+              </div>
+              <h2 className="text-xl font-bold">Responderam seu roteiro anônimo</h2>
+              <button
+                type="button"
+                onClick={() => setActiveScriptId(pendingScriptResponse.id)}
+                className="mt-5 h-12 w-full rounded-full bg-white font-bold text-black"
+              >
+                Abrir resposta
               </button>
             </motion.div>
           </div>
@@ -308,7 +381,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <button
                   type="button"
                   onClick={async () => {
-                    await markAnonymousScriptRead(activeAnonymousScript.id);
+                    if (activeScriptIsSentResponse) {
+                      markScriptResponseSeen(activeAnonymousScript.id);
+                    } else if (activeScriptIsReceived) {
+                      await markAnonymousScriptRead(activeAnonymousScript.id);
+                    }
                     setActiveScriptId('');
                   }}
                   className="rounded-full bg-white/5 p-2 text-zinc-300"
@@ -324,12 +401,47 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   <p className="mb-5 font-mono text-sm font-bold uppercase">{activeAnonymousScript.sceneHeading}</p>
                   <p className="whitespace-pre-wrap font-mono text-sm leading-7">{activeAnonymousScript.body}</p>
                 </div>
+                {activeScriptIsSentResponse && (
+                  <div className="mt-4 rounded-[22px] border border-[#E4B5C2]/25 bg-[#3F1521]/35 p-4">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#E4B5C2]">Resposta recebida</p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{activeAnonymousScript.responseText}</p>
+                  </div>
+                )}
+                {activeScriptIsReceived && activeAnonymousScript.responseText && (
+                  <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-4">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#E4B5C2]">Sua resposta</p>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{activeAnonymousScript.responseText}</p>
+                  </div>
+                )}
+                {activeScriptIsReceived && !activeAnonymousScript.responseText && (
+                  <div className="mt-4 space-y-3">
+                    <textarea
+                      value={scriptResponseText}
+                      onChange={(event) => setScriptResponseText(event.target.value)}
+                      className="min-h-24 w-full resize-none rounded-[22px] border border-white/10 bg-[#17171B] px-4 py-3 text-sm text-white outline-none focus:border-white/25"
+                      placeholder="Responder é opcional..."
+                    />
+                    {scriptResponseError && <p className="text-sm text-red-300">{scriptResponseError}</p>}
+                    <button
+                      type="button"
+                      disabled={isRespondingToScript || !scriptResponseText.trim()}
+                      onClick={handleRespondToAnonymousScript}
+                      className="h-11 w-full rounded-full bg-[#3F1521] text-sm font-bold text-white disabled:opacity-50"
+                    >
+                      {isRespondingToScript ? 'Enviando...' : 'Responder anonimamente'}
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="border-t border-white/10 p-4">
                 <button
                   type="button"
                   onClick={async () => {
-                    await markAnonymousScriptRead(activeAnonymousScript.id);
+                    if (activeScriptIsSentResponse) {
+                      markScriptResponseSeen(activeAnonymousScript.id);
+                    } else if (activeScriptIsReceived) {
+                      await markAnonymousScriptRead(activeAnonymousScript.id);
+                    }
                     setActiveScriptId('');
                   }}
                   className="h-11 w-full rounded-full bg-white text-sm font-bold text-black"

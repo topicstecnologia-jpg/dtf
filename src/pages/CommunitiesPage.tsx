@@ -80,6 +80,7 @@ export const CommunitiesPage: React.FC = () => {
     anonymousScripts,
     sendAnonymousScript,
     markAnonymousScriptRead,
+    respondToAnonymousScript,
     deleteAnonymousScript,
     getUserById
   } = useApp();
@@ -122,6 +123,9 @@ export const CommunitiesPage: React.FC = () => {
   const [scriptError, setScriptError] = useState('');
   const [isSendingScript, setIsSendingScript] = useState(false);
   const [openScriptId, setOpenScriptId] = useState('');
+  const [openScriptResponse, setOpenScriptResponse] = useState('');
+  const [openScriptResponseError, setOpenScriptResponseError] = useState('');
+  const [isRespondingOpenScript, setIsRespondingOpenScript] = useState(false);
 
   const directorCommunity = communities.find(community => community.ownerId === user?.id);
   const selectedCommunity = selectedCommunityId ? communities.find(community => community.id === selectedCommunityId) : undefined;
@@ -382,6 +386,22 @@ export const CommunitiesPage: React.FC = () => {
     }
   };
 
+  const handleRespondOpenScript = async () => {
+    if (!openScript || !openScriptResponse.trim()) return;
+    setOpenScriptResponseError('');
+    setIsRespondingOpenScript(true);
+
+    try {
+      await respondToAnonymousScript(openScript.id, openScriptResponse);
+      setOpenScriptResponse('');
+      setOpenScriptId('');
+    } catch (error) {
+      setOpenScriptResponseError(error instanceof Error ? error.message : 'Não foi possível enviar a resposta.');
+    } finally {
+      setIsRespondingOpenScript(false);
+    }
+  };
+
   return (
     <div className={`min-h-screen bg-[#17171B] text-white ${selectedRoomId ? 'pb-0' : 'pb-28'}`}>
       <div className="sticky top-0 z-40 border-b border-white/5 bg-[#17171B]/90 px-4 py-4 backdrop-blur-xl">
@@ -573,7 +593,11 @@ export const CommunitiesPage: React.FC = () => {
                   <button
                     key={script.id}
                     type="button"
-                    onClick={() => setOpenScriptId(script.id)}
+                    onClick={() => {
+                      setOpenScriptResponse('');
+                      setOpenScriptResponseError('');
+                      setOpenScriptId(script.id);
+                    }}
                     className="flex w-full items-center justify-between rounded-[20px] border border-white/10 bg-black/20 px-4 py-3 text-left"
                   >
                     <span className="min-w-0">
@@ -975,6 +999,30 @@ export const CommunitiesPage: React.FC = () => {
                 <p className="mb-5 font-mono text-sm font-bold uppercase">{openScript.sceneHeading}</p>
                 <p className="whitespace-pre-wrap font-mono text-sm leading-7">{openScript.body}</p>
               </div>
+              {openScript.responseText ? (
+                <div className="mt-4 rounded-[22px] border border-white/10 bg-white/5 p-4">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#E4B5C2]">Sua resposta</p>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-white">{openScript.responseText}</p>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  <textarea
+                    value={openScriptResponse}
+                    onChange={(event) => setOpenScriptResponse(event.target.value)}
+                    className="min-h-24 w-full resize-none rounded-[22px] border border-white/10 bg-[#17171B] px-4 py-3 text-sm text-white outline-none focus:border-white/25"
+                    placeholder="Responder é opcional..."
+                  />
+                  {openScriptResponseError && <p className="text-sm text-red-300">{openScriptResponseError}</p>}
+                  <button
+                    type="button"
+                    disabled={isRespondingOpenScript || !openScriptResponse.trim()}
+                    onClick={handleRespondOpenScript}
+                    className="h-11 w-full rounded-full bg-[#3F1521] text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    {isRespondingOpenScript ? 'Enviando...' : 'Responder anonimamente'}
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex gap-2 border-t border-white/10 p-4">
               <button

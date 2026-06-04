@@ -171,6 +171,8 @@ create table if not exists public.anonymous_scripts (
   title text not null,
   scene_heading text not null,
   body text not null,
+  response_text text,
+  response_at timestamptz,
   read_at timestamptz,
   expires_at timestamptz not null default (now() + interval '24 hours'),
   created_at timestamptz not null default now()
@@ -181,6 +183,12 @@ alter table public.community_messages
 
 alter table public.anonymous_scripts
   add column if not exists read_at timestamptz;
+
+alter table public.anonymous_scripts
+  add column if not exists response_text text;
+
+alter table public.anonymous_scripts
+  add column if not exists response_at timestamptz;
 
 alter table public.anonymous_scripts
   add column if not exists expires_at timestamptz not null default (now() + interval '24 hours');
@@ -999,7 +1007,10 @@ drop policy if exists "Recipients can read anonymous scripts" on public.anonymou
 create policy "Recipients can read anonymous scripts"
   on public.anonymous_scripts for select
   to authenticated
-  using (auth.uid() = recipient_id);
+  using (
+    auth.uid() = recipient_id
+    or (auth.uid() = sender_id and response_text is not null)
+  );
 
 drop policy if exists "Users can send anonymous scripts" on public.anonymous_scripts;
 create policy "Users can send anonymous scripts"

@@ -86,11 +86,14 @@ export interface Community {
 
 export interface AnonymousScript {
   id: string;
+  senderId?: string;
   recipientId: string;
   mode: 'instant' | '24h';
   title: string;
   sceneHeading: string;
   body: string;
+  responseText?: string;
+  responseAt?: number;
   readAt?: number;
   expiresAt: number;
   timestamp: number;

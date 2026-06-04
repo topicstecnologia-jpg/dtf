@@ -59,6 +59,7 @@ interface AppContextType {
   enterCommunityRoom: (communityId: string, roomId: string) => Promise<void>;
   sendAnonymousScript: (values: { recipientHandle: string; mode: AnonymousScript['mode']; title: string; body: string }) => Promise<void>;
   markAnonymousScriptRead: (scriptId: string) => Promise<void>;
+  respondToAnonymousScript: (scriptId: string, responseText: string) => Promise<void>;
   deleteAnonymousScript: (scriptId: string) => Promise<void>;
   toggleFollowUser: (targetUserId: string) => Promise<void>;
   createPost: (values: { caption: string; imageFile?: File | null }) => Promise<void>;
@@ -355,20 +356,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const mapAnonymousScriptRow = (row: any): AnonymousScript => ({
     id: row.id,
+    senderId: row.sender_id || undefined,
     recipientId: row.recipient_id,
     mode: row.mode || 'instant',
     title: row.title || 'Roteiro anônimo',
     sceneHeading: row.scene_heading || 'SALA. INT. NOITE',
     body: row.body || '',
+    responseText: row.response_text || undefined,
+    responseAt: row.response_at ? new Date(row.response_at).getTime() : undefined,
     readAt: row.read_at ? new Date(row.read_at).getTime() : undefined,
     expiresAt: row.expires_at ? new Date(row.expires_at).getTime() : Date.now(),
     timestamp: new Date(row.created_at).getTime()
   });
 
-  const filterVisibleAnonymousScripts = (scripts: AnonymousScript[]) => (
+  const filterVisibleAnonymousScripts = (scripts: AnonymousScript[], currentUserId = user?.id) => (
     scripts.filter(script => (
       script.expiresAt > Date.now() &&
-      (script.mode !== 'instant' || !script.readAt)
+      (
+        script.senderId === currentUserId && Boolean(script.responseText)
+          ? true
+          : script.mode !== 'instant' || !script.readAt
+      )
     ))
   );
 
@@ -480,7 +488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data, error } = await supabase
       .from('anonymous_scripts')
       .select('*')
-      .eq('recipient_id', currentUserId)
+      .or(`recipient_id.eq.${currentUserId},and(sender_id.eq.${currentUserId},response_text.not.is.null)`)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false });
 
@@ -489,7 +497,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    setAnonymousScripts(filterVisibleAnonymousScripts((data || []).map(mapAnonymousScriptRow)));
+    setAnonymousScripts(filterVisibleAnonymousScripts((data || []).map(mapAnonymousScriptRow), currentUserId));
   };
 
   const refreshAppData = async (currentUserId: string) => {
@@ -761,6 +769,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const appendCommunityMessage = (message: CommunityMessage) => {
+    setCommunities(prev => prev.map(community => {
+      if (community.id !== message.communityId || community.messages.some(item => item.id === message.id)) return community;
+      return { ...community, messages: [...community.messages, message] };
+    }));
+  };
+
   useEffect(() => {
     if (!supabase || !user) return;
     const realtimeClient = supabase;
@@ -985,8 +1000,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'community_messages' },
-        () => {
-          loadCommunities();
+        (payload) => {
+          appendCommunityMessage(mapCommunityMessageRow(payload.new as any));
         }
       )
       .on(
@@ -994,7 +1009,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         { event: 'INSERT', schema: 'public', table: 'anonymous_scripts', filter: `recipient_id=eq.${user.id}` },
         (payload) => {
           const script = mapAnonymousScriptRow(payload.new as any);
-          setAnonymousScripts(prev => filterVisibleAnonymousScripts([script, ...prev.filter(item => item.id !== script.id)]));
+          setAnonymousScripts(prev => filterVisibleAnonymousScripts([script, ...prev.filter(item => item.id !== script.id)], user.id));
         }
       )
       .on(
@@ -1002,7 +1017,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         { event: 'UPDATE', schema: 'public', table: 'anonymous_scripts', filter: `recipient_id=eq.${user.id}` },
         (payload) => {
           const script = mapAnonymousScriptRow(payload.new as any);
-          setAnonymousScripts(prev => filterVisibleAnonymousScripts(prev.map(item => item.id === script.id ? script : item)));
+          setAnonymousScripts(prev => filterVisibleAnonymousScripts(prev.map(item => item.id === script.id ? script : item), user.id));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'anonymous_scripts', filter: `sender_id=eq.${user.id}` },
+        (payload) => {
+          const script = mapAnonymousScriptRow(payload.new as any);
+          if (!script.responseText) return;
+          setAnonymousScripts(prev => filterVisibleAnonymousScripts([script, ...prev.filter(item => item.id !== script.id)], user.id));
         }
       )
       .on(
@@ -1529,6 +1553,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? prev.filter(item => item.id !== scriptId)
         : prev.map(item => item.id === scriptId ? { ...item, readAt: Date.now() } : item)
     ));
+  };
+
+  const respondToAnonymousScript = async (scriptId: string, responseText: string) => {
+    if (!user || !supabase || !responseText.trim()) return;
+    const respondedAt = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('anonymous_scripts')
+      .update({
+        response_text: responseText.trim(),
+        response_at: respondedAt,
+        read_at: respondedAt
+      })
+      .eq('id', scriptId)
+      .eq('recipient_id', user.id);
+
+    if (error) throw new Error(error.message);
+
+    setAnonymousScripts(prev => prev.map(item => (
+      item.id === scriptId
+        ? { ...item, responseText: responseText.trim(), responseAt: Date.now(), readAt: Date.now() }
+        : item
+    )));
   };
 
   const deleteAnonymousScript = async (scriptId: string) => {
@@ -2191,6 +2238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     enterCommunityRoom,
     sendAnonymousScript,
     markAnonymousScriptRead,
+    respondToAnonymousScript,
     deleteAnonymousScript,
     toggleFollowUser,
     createPost,
